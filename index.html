@@ -2,208 +2,366 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#150f2b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <title>Step Forward Stage</title>
 <meta name="description" content="Live 3D party game: step forward if you have…">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Rubik:wght@400;500;700&display=swap">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Rubik:wght@400;500;600;700&display=swap">
 <style>
-  /* Layout: full-bleed 3D stage, a marquee banner on top, one control tray docked at the bottom. */
+  /* Layout: 3D stage fills the screen; a compact HUD sits on top, one bottom sheet holds the controls
+     (docked to the right on landscape phones). The camera re-frames the stage into the space left free. */
   :root {
     --night: #150f2b;
-    --stage: #3a2468;
+    --night-2: #1f1640;
+    --glass: rgba(24, 16, 50, 0.86);
+    --glass-strong: rgba(30, 20, 62, 0.96);
+    --edge: rgba(255, 255, 255, 0.10);
+    --edge-strong: rgba(255, 255, 255, 0.18);
     --ink: #f6f1ff;
-    --muted: #b9acd9;
+    --muted: #b3a6d6;
+    --faint: #7d71a3;
     --marquee: #ffd23f;
-    --go: #3fbf7f;
+    --marquee-ink: #241640;
+    --go: #3fd08a;
+    --go-ink: #082417;
     --stay: #ff6b8b;
-    --tray: rgba(26, 18, 52, 0.92);
-    --line: rgba(255, 255, 255, 0.12);
+    --stay-ink: #3a0d1a;
     --display: "Bungee", "Impact", "Arial Black", sans-serif;
-    --body: "Rubik", "Segoe UI", system-ui, sans-serif;
+    --body: "Rubik", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --gutter-l: max(14px, env(safe-area-inset-left, 0px));
+    --gutter-r: max(14px, env(safe-area-inset-right, 0px));
+    --safe-t: env(safe-area-inset-top, 0px);
+    --safe-b: env(safe-area-inset-bottom, 0px);
+    --kb: 0px;
+    --sheet-w: min(380px, 46vw);
     color-scheme: dark;
   }
-  html, body { height: 100%; }
-  :root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); box-sizing: border-box; }
-  [hidden] { display: none !important; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
   body {
-    margin: 0;
     background: var(--night);
     color: var(--ink);
-    font-family: var(--body);
-    font-size: 15px;
+    font: 15px/1.4 var(--body);
     overflow: hidden;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-font-smoothing: antialiased;
   }
-  #app { position: relative; height: 100%; overflow: hidden; }
-  #scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  [hidden] { display: none !important; }
+  button, input { font: inherit; color: inherit; }
+  button { touch-action: manipulation; user-select: none; -webkit-user-select: none; cursor: pointer; }
+  button:disabled { cursor: not-allowed; }
+  :focus-visible { outline: 2px solid var(--marquee); outline-offset: 2px; }
+  svg.i { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  #app { position: fixed; inset: 0; overflow: hidden; }
+  #scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+  /* ---------- name tags over the 3D characters ---------- */
   #tags { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
-  .tag {
-    position: absolute; left: 0; top: 0;
-    display: flex; flex-direction: column; align-items: center; gap: 3px;
-    white-space: nowrap; will-change: transform;
-  }
-  .tag .nm {
-    font: 700 12px/1 var(--body);
-    padding: 4px 8px; border-radius: 999px;
-    background: rgba(10, 6, 24, 0.72); color: var(--ink);
-  }
-  .tag.me .nm { background: var(--marquee); color: #241640; }
-  .tag .st { font: 400 11px/1 var(--display); letter-spacing: 0.04em; padding: 3px 7px; border-radius: 4px; }
+  .tag { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; white-space: nowrap; will-change: transform; }
+  .tag .nm { font: 600 12px/1 var(--body); padding: 4px 8px; border-radius: 999px; background: rgba(10, 6, 24, 0.74); max-width: 110px; overflow: hidden; text-overflow: ellipsis; }
+  .tag.me .nm { background: var(--marquee); color: var(--marquee-ink); }
+  .tag .st { font: 400 10px/1 var(--display); letter-spacing: 0.05em; padding: 3px 6px; border-radius: 4px; }
   .tag .st:empty { display: none; }
   .tag .st.wait { color: var(--muted); background: rgba(10, 6, 24, 0.6); }
-  .tag .st.ready { color: #0e2a1c; background: var(--go); }
-  .tag .st.me { color: #241640; background: var(--marquee); }
+  .tag .st.ready { color: var(--go-ink); background: var(--go); }
+  .tag .st.me { color: var(--marquee-ink); background: var(--marquee); }
 
-  #banner {
-    position: absolute; top: 10px; left: 0; right: 0;
-    padding-left: max(16px, env(safe-area-inset-left, 0px));
-    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  /* ---------- HUD ---------- */
+  .hud {
+    position: absolute; top: 0; left: 0; right: 0;
+    padding: calc(var(--safe-t) + 10px) var(--gutter-r) 0 var(--gutter-l);
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    pointer-events: none;
+  }
+  .hud > * { pointer-events: auto; width: 100%; max-width: 720px; }
+  .hud-bar { display: flex; align-items: center; gap: 8px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    height: 36px; padding: 0 12px; border-radius: 999px;
+    background: var(--glass); border: 1px solid var(--edge);
+    font-size: 12px; font-weight: 600; white-space: nowrap;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  }
+  button.chip:active { transform: scale(0.97); }
+  .chip .lbl { color: var(--muted); font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; font-size: 10px; }
+  .chip b { font: 400 14px var(--display); color: var(--marquee); letter-spacing: 0.08em; }
+  .chip svg.i { width: 16px; height: 16px; color: var(--muted); }
+  .spacer { flex: 1; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
+  .live .dot { background: var(--go); box-shadow: 0 0 0 3px rgba(63, 208, 138, 0.2); }
+  .icon-btn {
+    width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--glass); border: 1px solid var(--edge); padding: 0;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  }
+  .icon-btn:active { transform: scale(0.94); }
+  .icon-btn[aria-pressed=false] { color: var(--faint); }
+
+  .qcard {
+    background: var(--glass); border: 1px solid var(--edge); border-radius: 18px;
+    padding: 10px 16px 12px; text-align: center;
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  }
+  .steps { display: flex; justify-content: center; align-items: center; gap: 6px; font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); }
+  .steps span { display: inline-flex; align-items: center; gap: 6px; }
+  .steps span + span::before { content: ""; width: 14px; height: 1px; background: var(--edge-strong); }
+  .steps .on { color: var(--marquee); }
+  .steps .done { color: var(--muted); }
+  #q { margin: 6px 0 2px; font: 400 clamp(18px, 5.4vw, 30px)/1.15 var(--display); color: var(--marquee); text-wrap: balance; overflow-wrap: anywhere; }
+  #q .lead { display: block; font: 600 11px/1.2 var(--body); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+  .meter { height: 6px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); overflow: hidden; margin: 8px auto 2px; max-width: 320px; }
+  .meter > div { height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, var(--go), #9ff0c6); transition: width 0.35s ease; }
+  #sub { margin: 4px 0 0; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+  #sub b { color: var(--ink); font-weight: 600; }
+
+  /* ---------- toasts ---------- */
+  #toasts { position: absolute; left: 0; right: 0; top: var(--hud-bottom, 120px); display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; padding: 8px var(--gutter-r) 0 var(--gutter-l); }
+  .toast { background: var(--glass-strong); border: 1px solid var(--edge-strong); border-radius: 999px; padding: 7px 14px; font-size: 13px; font-weight: 500; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35); animation: toast-in 0.25s ease both; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .toast.out { animation: toast-out 0.3s ease both; }
+  @keyframes toast-in { from { opacity: 0; transform: translateY(-6px) scale(0.97); } }
+  @keyframes toast-out { to { opacity: 0; transform: translateY(-6px); } }
+
+  /* ---------- bottom sheet ---------- */
+  .sheet {
+    position: absolute; left: 0; right: 0; bottom: var(--kb);
+    padding: 0 var(--gutter-r) calc(var(--safe-b) + 10px) var(--gutter-l);
     display: flex; justify-content: center; pointer-events: none;
-  }
-  .marquee {
-    width: 100%; max-width: 760px;
-    background: var(--tray); border: 1px solid var(--line);
-    border-radius: 14px; padding: 12px 16px 14px;
-    text-align: center; pointer-events: auto;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-  }
-  .eyebrow {
-    display: flex; justify-content: space-between; align-items: center; gap: 8px;
-    font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted);
-  }
-  .pill { display: inline-flex; align-items: center; gap: 6px; }
-  .eyebrow .right { display: inline-flex; align-items: center; gap: 10px; }
-  #muteBtn { min-height: 28px; padding: 3px 10px; font: 500 11px var(--body); letter-spacing: 0.08em; text-transform: uppercase; border-radius: 999px; color: var(--muted); }
-  #muteBtn[aria-pressed=true] { color: var(--marquee); border-color: rgba(255, 210, 63, 0.5); }
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: #776a99; }
-  .pill.live .dot { background: var(--go); box-shadow: 0 0 8px var(--go); }
-  #q {
-    margin: 8px 0 4px;
-    font: 400 clamp(19px, 4.6vw, 30px)/1.15 var(--display);
-    color: var(--marquee); text-wrap: balance;
-  }
-  #sub { margin: 0; color: var(--ink); font-size: 14px; font-variant-numeric: tabular-nums; }
-
-  .tray {
-    position: absolute; left: 0; right: 0; bottom: 0;
-    padding-left: max(16px, env(safe-area-inset-left, 0px));
-    padding-right: max(16px, env(safe-area-inset-right, 0px));
-    padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
-    display: flex; justify-content: center;
+    transition: bottom 0.15s ease;
   }
   .panel {
-    width: 100%; max-width: 560px;
-    background: var(--tray); border: 1px solid var(--line);
-    border-radius: 16px; padding: 16px;
-    display: flex; flex-direction: column; gap: 12px;
-    box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.35);
+    pointer-events: auto;
+    width: 100%; max-width: 560px; max-height: min(64vh, 560px); overflow-y: auto; overscroll-behavior: contain;
+    background: var(--glass-strong); border: 1px solid var(--edge); border-radius: 24px;
+    padding: 16px; display: flex; flex-direction: column; gap: 14px;
+    box-shadow: 0 -12px 36px rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
   }
-  .panel h2 { margin: 0; font: 400 15px/1.2 var(--display); letter-spacing: 0.03em; color: var(--marquee); }
-  .row { display: flex; gap: 10px; flex-wrap: wrap; }
-  .row > * { flex: 1 1 140px; min-width: 0; }
-  label.lbl { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
-  input[type=text] {
-    width: 100%; box-sizing: border-box;
-    font: 500 16px var(--body); color: var(--ink);
-    background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line);
-    border-radius: 10px; padding: 12px 12px;
+  .panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .panel-head > div { min-width: 0; }
+  .kicker { font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+  .panel h2 { margin: 2px 0 0; font: 400 19px/1.2 var(--display); color: var(--ink); text-wrap: balance; }
+  .head-actions { display: flex; gap: 6px; flex: none; }
+  .ghost-btn { min-height: 36px; padding: 0 12px; border-radius: 999px; background: rgba(255, 255, 255, 0.06); border: 1px solid var(--edge); font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .ghost-btn svg.i { width: 16px; height: 16px; }
+  .ghost-btn.warn { background: rgba(255, 107, 139, 0.18); border-color: rgba(255, 107, 139, 0.5); color: #ffd0da; }
+
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field > span { font-size: 11px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+  .field input {
+    width: 100%; height: 52px; padding: 0 14px; border-radius: 14px;
+    background: rgba(255, 255, 255, 0.06); border: 1px solid var(--edge-strong);
+    font-size: 17px; font-weight: 500;
   }
-  input[type=text]:focus-visible { outline: 2px solid var(--marquee); outline-offset: 1px; }
-  button {
-    font: 700 15px var(--body); color: var(--ink);
-    background: rgba(255, 255, 255, 0.08); border: 1px solid var(--line);
-    border-radius: 10px; padding: 12px 14px; min-height: 48px; cursor: pointer;
+  .field input::placeholder { color: var(--faint); }
+  .field input:focus { outline: none; border-color: var(--marquee); box-shadow: 0 0 0 3px rgba(255, 210, 63, 0.18); }
+
+  .roles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .role {
+    text-align: left; padding: 14px; min-height: 104px; border-radius: 18px;
+    display: flex; flex-direction: column; justify-content: space-between; gap: 8px;
+    background: rgba(255, 255, 255, 0.05); border: 1px solid var(--edge-strong);
   }
-  button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.14); }
-  button:focus-visible { outline: 2px solid var(--marquee); outline-offset: 2px; }
-  button:disabled { opacity: 0.4; cursor: not-allowed; }
-  button.primary { background: var(--marquee); color: #241640; border-color: transparent; }
-  button.primary:hover:not(:disabled) { background: #ffe07a; }
-  button.big { font: 400 18px var(--display); min-height: 72px; letter-spacing: 0.02em; }
-  button.fwd { background: rgba(63, 191, 127, 0.16); border-color: rgba(63, 191, 127, 0.5); }
-  button.fwd[aria-pressed=true] { background: var(--go); color: #0e2a1c; }
-  button.stay { background: rgba(255, 107, 139, 0.14); border-color: rgba(255, 107, 139, 0.45); }
-  button.stay[aria-pressed=true] { background: var(--stay); color: #3a0d1a; }
-  button.link { background: none; border: none; min-height: 0; padding: 4px 0; color: var(--muted); font-weight: 500; text-decoration: underline; text-underline-offset: 3px; flex: 0 0 auto; }
-  .note { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
-  .tally { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size: 13px; margin: 0; }
-  .tally dt { color: var(--muted); }
-  .tally dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
-  .split { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-  .split .note { flex: 1; min-width: 0; }
-  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
-  .roomline { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--muted); }
-  .roomline b { font: 400 16px var(--display); color: var(--marquee); letter-spacing: 0.08em; }
-  .roomline button { min-height: 36px; padding: 6px 12px; font-size: 13px; }
+  .role .ico { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: rgba(63, 208, 138, 0.16); color: var(--go); }
+  .role.host .ico { background: rgba(255, 210, 63, 0.16); color: var(--marquee); }
+  .role b { display: block; font: 400 17px/1.1 var(--display); }
+  .role small { display: block; color: var(--muted); font-size: 12px; margin-top: 3px; }
+  .role:not(:disabled):active { transform: scale(0.98); }
+  .role.primary-role { background: linear-gradient(160deg, rgba(63, 208, 138, 0.22), rgba(63, 208, 138, 0.06)); border-color: rgba(63, 208, 138, 0.45); }
+  .role:disabled { opacity: 0.45; }
+
+  .lobby-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
+  .hint { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+  .links { display: flex; gap: 14px; flex: none; }
+  .link { background: none; border: 0; padding: 6px 0; min-height: 32px; color: var(--muted); font-size: 13px; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
+
+  .chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin: 0; padding: 0 0 2px; scroll-snap-type: x proximity; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chips button { flex: none; scroll-snap-align: start; height: 36px; padding: 0 12px; border-radius: 999px; background: rgba(255, 255, 255, 0.06); border: 1px solid var(--edge); font-size: 13px; white-space: nowrap; max-width: 78%; overflow: hidden; text-overflow: ellipsis; }
+  .chips button.picked { background: rgba(255, 210, 63, 0.16); border-color: rgba(255, 210, 63, 0.55); color: var(--marquee); }
+  .chips button.shuffle { color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+  .chips button.shuffle svg.i { width: 15px; height: 15px; }
+
+  .primary {
+    height: 58px; width: 100%; border-radius: 16px; border: 0;
+    background: var(--marquee); color: var(--marquee-ink);
+    font: 400 17px var(--display); letter-spacing: 0.02em;
+    display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+    box-shadow: 0 6px 18px rgba(255, 210, 63, 0.25);
+  }
+  .primary:not(:disabled):active { transform: scale(0.985); }
+  .primary:disabled { opacity: 0.45; box-shadow: none; }
+  .primary .count { font: 600 13px var(--body); padding: 3px 8px; border-radius: 999px; background: rgba(36, 22, 64, 0.14); font-variant-numeric: tabular-nums; }
+
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .stat { border-radius: 14px; padding: 10px 8px; text-align: center; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--edge); }
+  .stat b { display: block; font: 400 26px/1 var(--display); font-variant-numeric: tabular-nums; }
+  .stat span { display: block; margin-top: 4px; font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+  .stat.go b { color: var(--go); }
+  .stat.stay b { color: var(--stay); }
+  .names { margin: 0; font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+  .names b { color: var(--ink); font-weight: 600; }
+
+  .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .choice {
+    height: clamp(96px, 17vh, 132px); border-radius: 20px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    font: 400 18px/1.1 var(--display); letter-spacing: 0.02em; text-align: center; padding: 8px;
+    border: 2px solid transparent; position: relative;
+    transition: transform 0.12s ease, background 0.15s ease;
+  }
+  .choice svg.i { width: 30px; height: 30px; stroke-width: 2.4; }
+  .choice.fwd { background: rgba(63, 208, 138, 0.14); border-color: rgba(63, 208, 138, 0.45); color: #c9f7df; }
+  .choice.stay { background: rgba(255, 107, 139, 0.12); border-color: rgba(255, 107, 139, 0.42); color: #ffd3dd; }
+  .choice:active { transform: scale(0.97); }
+  .choice.fwd[aria-pressed=true] { background: var(--go); color: var(--go-ink); border-color: var(--go); }
+  .choice.stay[aria-pressed=true] { background: var(--stay); color: var(--stay-ink); border-color: var(--stay); }
+  .choice[aria-pressed=true]::after { content: "✓"; position: absolute; top: 8px; right: 12px; font: 700 16px var(--body); }
+  .choices.dim .choice[aria-pressed=false] { opacity: 0.55; }
+
+  .waitcard { display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 16px; background: rgba(255, 255, 255, 0.04); border: 1px dashed var(--edge-strong); }
+  .pulse { width: 12px; height: 12px; border-radius: 50%; background: var(--marquee); flex: none; animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(255, 210, 63, 0.5); } 50% { box-shadow: 0 0 0 8px rgba(255, 210, 63, 0); } }
+  .result { text-align: center; padding: 6px 0 2px; }
+  .result .big { font: 400 26px/1.1 var(--display); }
+  .result .big.go { color: var(--go); }
+  .result .big.stay { color: var(--stay); }
+  .result p { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+
+  /* ---------- small phones ---------- */
+  @media (max-width: 360px) {
+    .roles { grid-template-columns: 1fr; }
+    .role { min-height: 76px; flex-direction: row; align-items: center; justify-content: flex-start; }
+    .chip .lbl { display: none; }
+  }
+
+  /* ---------- landscape phones: dock the sheet on the right ---------- */
+  @media (orientation: landscape) and (max-height: 560px) {
+    .hud { right: var(--sheet-w); padding-right: 10px; }
+    .qcard { padding: 8px 12px 10px; }
+    #q { font-size: clamp(16px, 3.4vw, 22px); }
+    .meter { margin-top: 6px; }
+    .sheet { top: 0; bottom: 0; left: auto; width: var(--sheet-w); align-items: stretch; padding: calc(var(--safe-t) + 10px) var(--gutter-r) calc(var(--safe-b) + 10px) 0; }
+    .panel { max-height: none; height: 100%; border-radius: 20px; gap: 12px; padding: 14px; }
+    .roles { grid-template-columns: 1fr; }
+    .role { min-height: 56px; padding: 10px 12px; flex-direction: row; align-items: center; justify-content: flex-start; }
+    .role .ico { width: 30px; height: 30px; }
+    .field input { height: 44px; }
+    .panel h2 { font-size: 17px; }
+    .lobby-foot .hint { display: none; }
+    .primary { height: 52px; }
+    .choice { height: auto; flex: 1; min-height: 84px; }
+    .choices { flex: 1; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
 </style>
 </head>
 <body>
 
 <div id="app">
   <canvas id="scene" aria-label="3D stage with the players"></canvas>
-  <div id="tags"></div>
+  <div id="tags" aria-hidden="true"></div>
 
-  <header id="banner">
-    <div class="marquee">
-      <div class="eyebrow">
-        <span id="phaseLabel">Party game</span>
-        <span class="right"><button id="muteBtn" aria-pressed="true">Sound on</button><span class="pill" id="conn"><span class="dot"></span><span id="connText">Connecting…</span></span></span>
-      </div>
-      <h1 id="q">Step forward if you have…</h1>
-      <p id="sub">Pick a name, then join the stage or run the questions.</p>
+  <header class="hud" id="hud">
+    <div class="hud-bar">
+      <button class="chip" id="roomChip" aria-label="Invite friends to this room">
+        <span class="lbl">Room</span><b id="roomCode">----</b>
+        <svg class="i" viewBox="0 0 24 24"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 15V3"/><path d="m7 8 5-5 5 5"/></svg>
+      </button>
+      <div class="chip" id="conn" role="status"><span class="dot"></span><span id="connText">Connecting…</span></div>
+      <span class="spacer"></span>
+      <button class="icon-btn" id="muteBtn" aria-pressed="true" aria-label="Sound">
+        <svg class="i" id="icoSound" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+        <svg class="i" id="icoMute" viewBox="0 0 24 24" hidden><path d="M11 5 6 9H3v6h3l5 4z"/><path d="m22 9-6 6"/><path d="m16 9 6 6"/></svg>
+      </button>
+    </div>
+    <div class="qcard" aria-live="polite">
+      <div class="steps" id="steps"><span data-s="waiting">Ask</span><span data-s="answering">Decide</span><span data-s="reveal">Reveal</span></div>
+      <h1 id="q"><span class="lead">Step forward if you have…</span><span id="qText">…anything at all</span></h1>
+      <div class="meter" id="meter" hidden><div id="meterFill"></div></div>
+      <p id="sub">Pick a name, then play or host.</p>
     </div>
   </header>
 
-  <div class="tray">
+  <div id="toasts" aria-live="polite"></div>
+
+  <div class="sheet" id="sheet">
+    <!-- lobby -->
     <section class="panel" id="lobby">
-      <h2>Join the game</h2>
-      <div class="roomline">
-        <span>Room <b id="roomCode">----</b></span>
-        <span class="row" style="flex: 0 0 auto; gap: 6px">
-          <button id="copyBtn">Copy invite link</button>
-          <button id="newRoomBtn">New room</button>
-        </span>
+      <div class="panel-head">
+        <div><div class="kicker">Party game</div><h2>Join the stage</h2></div>
       </div>
-      <div>
-        <label class="lbl" for="nameIn">Your name</label>
-        <input type="text" id="nameIn" maxlength="16" autocomplete="nickname" placeholder="e.g. Maya">
+      <label class="field"><span>Your name</span>
+        <input type="text" id="nameIn" maxlength="16" autocomplete="nickname" enterkeyhint="done" placeholder="e.g. Maya">
+      </label>
+      <div class="roles">
+        <button class="role primary-role" id="joinBtn">
+          <span class="ico"><svg class="i" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></span>
+          <span><b>Play</b><small>Step forward or stay</small></span>
+        </button>
+        <button class="role host" id="qmBtn">
+          <span class="ico"><svg class="i" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></svg></span>
+          <span><b>Host</b><small id="qmBtnSub">Ask the questions</small></span>
+        </button>
       </div>
-      <div class="row">
-        <button class="primary" id="joinBtn">Join the stage</button>
-        <button id="qmBtn">Be Question Master</button>
-      </div>
-      <div class="split">
-        <p class="note" id="lobbyNote">Everyone with this link plays together live.</p>
-        <button class="link" id="practiceBtn">Practice with bots</button>
+      <div class="lobby-foot">
+        <p class="hint" id="lobbyNote">Everyone with your invite link plays together.</p>
+        <div class="links"><button class="link" id="newRoomBtn">New room</button><button class="link" id="practiceBtn">Practice with bots</button></div>
       </div>
     </section>
 
+    <!-- question master -->
     <section class="panel" id="qmPanel" hidden>
-      <div class="split"><h2>You're the Question Master</h2><button class="link" id="qmLeave">Leave</button></div>
-      <div>
-        <label class="lbl" for="qIn">Step forward if you have…</label>
-        <div class="row">
-          <input type="text" id="qIn" maxlength="120" placeholder="ever seen snow" style="flex: 3 1 180px">
-          <button id="randBtn" style="flex: 1 1 90px">Random</button>
+      <div class="panel-head">
+        <div><div class="kicker" id="qmKicker">You're the host</div><h2 id="qmTitle">Ask the room</h2></div>
+        <div class="head-actions">
+          <button class="ghost-btn" id="qmInvite"><svg class="i" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6"/><path d="M22 11h-6"/></svg>Invite</button>
+          <button class="ghost-btn" id="qmLeave">Leave</button>
         </div>
       </div>
-      <div class="row">
-        <button class="primary" id="askBtn">Ask</button>
-        <button id="revealBtn">Reveal!</button>
-        <button id="nextBtn">Next round</button>
+      <div id="qmAsk" class="field-group" style="display:flex;flex-direction:column;gap:10px">
+        <label class="field"><span>Step forward if you have…</span>
+          <input type="text" id="qIn" maxlength="120" enterkeyhint="send" placeholder="ever seen snow">
+        </label>
+        <div class="chips" id="sugg" role="list" aria-label="Question ideas"></div>
       </div>
-      <dl class="tally" id="tally"></dl>
+      <div id="qmLive" hidden style="display:flex;flex-direction:column;gap:10px">
+        <div class="stats">
+          <div class="stat go"><b id="stFwd">0</b><span>Forward</span></div>
+          <div class="stat stay"><b id="stStay">0</b><span>Stay</span></div>
+          <div class="stat"><b id="stWait">0</b><span>Deciding</span></div>
+        </div>
+        <p class="names" id="qmNames"></p>
+      </div>
+      <button class="primary" id="qmAction">Ask a random one</button>
     </section>
 
+    <!-- player -->
     <section class="panel" id="playerPanel" hidden>
-      <div class="row">
-        <button class="big fwd" id="fwdBtn" aria-pressed="false">Step forward</button>
-        <button class="big stay" id="stayBtn" aria-pressed="false">Stay</button>
+      <div class="panel-head">
+        <div><div class="kicker" id="plKicker">On stage</div><h2 id="plTitle">Get ready</h2></div>
+        <div class="head-actions"><button class="ghost-btn" id="playerLeave">Leave</button></div>
       </div>
-      <div class="split">
-        <p class="note" id="playerNote">Waiting for the Question Master.</p>
-        <button class="link" id="playerLeave">Leave</button>
+      <div class="waitcard" id="plWait"><span class="pulse"></span><p class="hint" id="plWaitText">Waiting for the host to ask.</p></div>
+      <div class="choices" id="choices" hidden>
+        <button class="choice fwd" id="fwdBtn" aria-pressed="false">
+          <svg class="i" viewBox="0 0 24 24"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>Step forward
+        </button>
+        <button class="choice stay" id="stayBtn" aria-pressed="false">
+          <svg class="i" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>Stay
+        </button>
       </div>
+      <div class="result" id="plResult" hidden><div class="big" id="plResultBig"></div><p id="plResultSub"></p></div>
+      <p class="hint" id="plHint" style="text-align:center"></p>
     </section>
   </div>
 </div>
@@ -254,7 +412,10 @@
   let myLook = parseInt(store.get("sf-look"), 10);
   if (!Number.isFinite(myLook)) { myLook = Math.floor(Math.random() * 60); store.set("sf-look", String(myLook)); }
   $("nameIn").value = store.get("sf-name") || "";
-
+  const clean = (v, fb) => {
+    const t = String(v == null ? "" : v).replace(/[\u0000-\u001f]/g, "").trim().slice(0, 16);
+    return t || fb;
+  };
   // ---------- sound effects (synthesized with Web Audio, no files) ----------
   const sfx = (() => {
     let ctx = null, master = null, muted = store.get("sf-mute") === "1";
@@ -322,32 +483,6 @@
       get muted() { return muted; },
     };
   })();
-  // browsers only allow sound after a tap
-  document.addEventListener("pointerdown", () => sfx.unlock(), { passive: true });
-  const syncMute = () => { $("muteBtn").textContent = sfx.muted ? "Sound off" : "Sound on"; $("muteBtn").setAttribute("aria-pressed", String(!sfx.muted)); };
-  $("muteBtn").addEventListener("click", () => { sfx.toggle(); syncMute(); });
-  syncMute();
-
-  // play sounds when the shared game state changes, so everyone hears the same moments
-  let prevSound = null;
-  function soundHook(s) {
-    const g = s.game;
-    const cur = { phase: g ? g.phase : "none", round: g ? g.round : 0, n: s.players.length,
-      decided: s.players.filter((p) => p.choice >= 0).length, fwd: s.players.filter((p) => p.choice === 1).length };
-    const prev = prevSound; prevSound = cur;
-    if (!prev) return;  // first render: stay quiet
-    if (cur.phase === "answering" && (prev.phase !== "answering" || prev.round !== cur.round)) sfx.play("ask");
-    else if (cur.phase === "reveal" && prev.phase !== "reveal") sfx.play("reveal", cur.fwd);
-    else if (cur.phase === "waiting" && prev.phase === "reveal") sfx.play("whoosh");
-    else if (cur.phase === "answering" && cur.decided > prev.decided) sfx.play("tick");
-    if (cur.n > prev.n) sfx.play("pop");
-  }
-
-  const clean = (v, fb) => {
-    const s = String(v == null ? "" : v).replace(/[\u0000-\u001f]/g, "").trim().slice(0, 16);
-    return s || fb;
-  };
-
   // ---------- pixel-art sprites (two frames: idle, cheering) ----------
   const hex = (h) => [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)];
   const dark = (c, f) => c.map((v) => Math.round(v * (1 - f)));
@@ -502,20 +637,55 @@
       a.st.textContent = p.st; a.st.className = "st " + p.cls;
     });
   }
+  // ---------- camera framing: fit the stage into the space the HUD and sheet leave free ----------
+  const TARGET = new THREE.Vector3(0, 1.3, 1.5);
+  const DIR = new THREE.Vector3(0, 0.46, 1).normalize();
+  const FOV = 45;
+  camera.fov = FOV;
+  let camDist = 15, camDistGoal = 15, stageCount = 0, snapCam = true;
+  const off = { x: 0, y: 0 }, offGoal = { x: 0, y: 0 };
 
-  // ---------- layout + loop ----------
-  function resize() {
-    const w = canvas.clientWidth || window.innerWidth, h = canvas.clientHeight || window.innerHeight;
-    renderer.setSize(w, h, false);
-    camera.aspect = w / h;
-    const a = camera.aspect;
-    if (a < 1) { camera.position.set(0, 7.5 + (1 - a) * 6, 13 + (1 - a) * 18); lookAt.set(0, -0.6, 1); }
-    else { camera.position.set(0, 6.5, 13); lookAt.set(0, 1.1, 1); }
-    camera.lookAt(lookAt);
-    camera.updateProjectionMatrix();
+  function frame() {
+    const W = canvas.clientWidth || window.innerWidth, H = canvas.clientHeight || window.innerHeight;
+    if (!W || !H) return;
+    renderer.setSize(W, H, false);
+    camera.aspect = W / H;
+    const hudR = $("hud").getBoundingClientRect();
+    const panel = Array.from(document.querySelectorAll(".panel")).find((p) => !p.hidden);
+    const pr = panel ? panel.getBoundingClientRect() : null;
+    let top = hudR.bottom + 6, bottom = H, left = 0, right = W;
+    const side = !!pr && pr.left > W * 0.35 && pr.height > H * 0.5;
+    if (pr) { if (side) right = pr.left - 8; else bottom = pr.top - 4; }
+    document.documentElement.style.setProperty("--hud-bottom", Math.round(hudR.bottom) + "px");
+    const fw = Math.max(right - left, W * 0.35);
+    const fh = Math.max(bottom - top, H * 0.22);
+    const cy = bottom - top >= H * 0.22 ? (top + bottom) / 2 : top + fh / 2;
+    offGoal.x = W / 2 - (left + right) / 2;
+    offGoal.y = H / 2 - cy;
+    const tanH = Math.tan(THREE.MathUtils.degToRad(FOV / 2));
+    const n = stageCount, spacing = Math.min(1.9, 19 / Math.max(n, 1));
+    const span = Math.max(7, (n > 1 ? (n - 1) * spacing : 0) + 2.6);
+    const dV = 4.6 / (2 * tanH * (fh / H));
+    const dH = span / (2 * tanH * camera.aspect * (fw / W));
+    camDistGoal = Math.min(48, Math.max(9, dV, dH));
+    if (snapCam) { camDist = camDistGoal; off.x = offGoal.x; off.y = offGoal.y; snapCam = false; }
   }
-  window.addEventListener("resize", resize);
-  resize();
+  window.addEventListener("resize", frame);
+  window.addEventListener("orientationchange", () => setTimeout(frame, 250));
+  if (window.ResizeObserver) {
+    const ro = new ResizeObserver(() => frame());
+    ro.observe($("hud")); document.querySelectorAll(".panel").forEach((p) => ro.observe(p));
+  }
+  // keep the sheet above the on-screen keyboard
+  if (window.visualViewport) {
+    const vv = window.visualViewport;
+    const onVV = () => {
+      const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      document.documentElement.style.setProperty("--kb", (kb > 60 ? kb : 0) + "px");
+      frame();
+    };
+    vv.addEventListener("resize", onVV); vv.addEventListener("scroll", onVV);
+  }
 
   let phaseNow = "none";
   const tmp = new THREE.Vector3();
@@ -523,27 +693,34 @@
   function tick(now) {
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
     const t = now / 1000;
-    const w = canvas.clientWidth, h = canvas.clientHeight;
+    const W = canvas.clientWidth, H = canvas.clientHeight;
+    if (W && H) {
+      const k = 1 - Math.exp(-dt * 4);
+      camDist += (camDistGoal - camDist) * k;
+      off.x += (offGoal.x - off.x) * k; off.y += (offGoal.y - off.y) * k;
+      camera.position.copy(TARGET).addScaledVector(DIR, camDist);
+      camera.lookAt(TARGET);
+      camera.setViewOffset(W, H, off.x, off.y, W, H);
+    }
     for (const a of avatars.values()) {
       const p = a.g.position;
       const dx = a.target.x - p.x, dz = a.target.z - p.z, dist = Math.hypot(dx, dz);
       if (dist > 0.001) { const step = Math.min(dist, WALK * dt); p.x += dx / dist * step; p.z += dz / dist * step; }
       p.y = dist > 0.02 ? Math.abs(Math.sin(t * 14 + a.seed)) * 0.25 : 0;
       a.spr.position.y = 1.2 + Math.sin(t * 2.5 + a.seed) * 0.03;
-      a.spr.rotation.y = Math.atan2(camera.position.x - p.x, camera.position.z - p.z); // billboard around Y
+      a.spr.rotation.y = Math.atan2(camera.position.x - p.x, camera.position.z - p.z); // billboard around Y, like Sprite3D
       tmp.set(p.x, p.y + 2.55, p.z).project(camera);
-      if (tmp.z > 1) { a.tag.style.visibility = "hidden"; continue; }
+      if (tmp.z > 1 || Math.abs(tmp.x) > 1.2) { a.tag.style.visibility = "hidden"; continue; }
       a.tag.style.visibility = "visible";
-      a.tag.style.transform = `translate(${(tmp.x * 0.5 + 0.5) * w}px, ${(-tmp.y * 0.5 + 0.5) * h}px) translate(-50%, -100%)`;
+      a.tag.style.transform = `translate(${(tmp.x * 0.5 + 0.5) * W}px, ${(-tmp.y * 0.5 + 0.5) * H}px) translate(-50%, -100%)`;
     }
     const speed = phaseNow === "reveal" ? 14 : phaseNow === "answering" ? 6 : 2.5;
-    const k = Math.floor(t * speed);
-    bulbs.forEach((b, i) => { b.material = (i + k) % 3 === 0 ? bulbOn : bulbOff; });
+    const kk = Math.floor(t * speed);
+    bulbs.forEach((b, i) => { b.material = (i + kk) % 3 === 0 ? bulbOn : bulbOff; });
     renderer.render(scene, camera);
     requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);
-
   // ---------- game state (shared through Firebase) ----------
   // `room` is a small adapter so the rest of the page can treat Firebase like a list of peers.
   let room = null, roomDead = false, live = false;
@@ -648,156 +825,283 @@
     gameRef.child("players").on("value", (s) => { fbPlayers = s.val() || {}; render(); }, onDbError);
     render();
   }
-
   const myName = () => {
     const n = clean($("nameIn").value, "");
     if (n) store.set("sf-name", n);
     return n || "Player " + (myLook % 90 + 10);
   };
+  const buzz = (p) => { try { if (navigator.vibrate) navigator.vibrate(p); } catch (e) {} };
 
-  // ---------- rendering the UI ----------
+  // ---------- sound on/off ----------
+  document.addEventListener("pointerdown", () => sfx.unlock(), { passive: true });
+  const syncMute = () => {
+    const on = !sfx.muted;
+    $("muteBtn").setAttribute("aria-pressed", String(on));
+    $("muteBtn").setAttribute("aria-label", on ? "Sound on. Tap to mute" : "Sound off. Tap to unmute");
+    $("icoSound").hidden = !on; $("icoMute").hidden = on;
+  };
+  $("muteBtn").addEventListener("click", () => { sfx.toggle(); syncMute(); });
+  syncMute();
+
+  // ---------- toasts ----------
+  function toast(msg) {
+    const box = $("toasts"), el = document.createElement("div");
+    el.className = "toast"; el.textContent = msg; box.appendChild(el);
+    while (box.children.length > 3) box.firstChild.remove();
+    setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 320); }, 2400);
+  }
+
+  // ---------- sounds, haptics and toasts follow the shared game state ----------
+  let prevSound = null, prevPlayers = null, prevHost = null;
+  function soundHook(s) {
+    const g = s.game;
+    const cur = { phase: g ? g.phase : "none", round: g ? g.round : 0, n: s.players.length,
+      decided: s.players.filter((p) => p.choice >= 0).length, fwd: s.players.filter((p) => p.choice === 1).length };
+    const prev = prevSound; prevSound = cur;
+    const names = new Map(s.players.map((p) => [p.key, p]));
+    const host = g ? g.name : null;
+    if (prev) {
+      if (cur.phase === "answering" && (prev.phase !== "answering" || prev.round !== cur.round)) { sfx.play("ask"); buzz(12); }
+      else if (cur.phase === "reveal" && prev.phase !== "reveal") { sfx.play("reveal", cur.fwd); buzz([20, 60, 30]); }
+      else if (cur.phase === "waiting" && prev.phase === "reveal") sfx.play("whoosh");
+      else if (cur.phase === "answering" && cur.decided > prev.decided) sfx.play("tick");
+      if (cur.n > prev.n) sfx.play("pop");
+      if (!practice && prevPlayers) {
+        for (const [k, p] of names) if (!prevPlayers.has(k) && !p.isMe) toast(p.name + " joined");
+        for (const [k, p] of prevPlayers) if (!names.has(k) && !p.isMe) toast(p.name + " left");
+        if (host && host !== prevHost && !g.isMe) toast(host + " is hosting");
+        if (!host && prevHost && mine.role === "player") toast(prevHost + " stopped hosting");
+      }
+    }
+    prevPlayers = names; prevHost = host;
+  }
+
+  // ---------- question ideas ----------
+  let suggestions = [];
+  function reshuffle() {
+    const pool = QUESTIONS.slice(); suggestions = [];
+    while (suggestions.length < 5 && pool.length) suggestions.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+    drawSugg();
+  }
+  function drawSugg() {
+    const el = $("sugg"), cur = $("qIn").value.trim();
+    el.replaceChildren();
+    suggestions.forEach((q) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.setAttribute("role", "listitem"); b.textContent = q;
+      if (cur === q) b.className = "picked";
+      b.addEventListener("click", () => { sfx.play("click"); $("qIn").value = q; drawSugg(); updateQmAction(); });
+      el.appendChild(b);
+    });
+    const sh = document.createElement("button");
+    sh.type = "button"; sh.className = "shuffle";
+    sh.innerHTML = '<svg class="i" viewBox="0 0 24 24"><path d="M16 3h5v5"/><path d="M4 20 21 3"/><path d="M21 16v5h-5"/><path d="m15 15 6 6"/><path d="M4 4l5 5"/></svg>More ideas';
+    sh.addEventListener("click", () => { sfx.play("click"); reshuffle(); });
+    el.appendChild(sh);
+  }
+
+  // ---------- render ----------
+  const PH = ["waiting", "answering", "reveal"];
+  function setSteps(phase) {
+    const j = PH.indexOf(phase);
+    document.querySelectorAll("#steps span").forEach((el) => {
+      const i = PH.indexOf(el.dataset.s);
+      el.className = j < 0 ? "" : i === j ? "on" : i < j ? "done" : "";
+    });
+  }
+  function setRich(el, parts) {
+    el.replaceChildren();
+    parts.forEach((p) => {
+      if (typeof p === "string") el.appendChild(document.createTextNode(p));
+      else { const b = document.createElement("b"); b.textContent = p.b; el.appendChild(b); }
+    });
+  }
+  const list = (arr) => arr.map((p) => p.name).join(", ");
+
+  let lastState = null;
   function render() {
     const s = derive(), g = s.game;
+    lastState = s;
     phaseNow = g ? g.phase : "none";
+    stageCount = s.players.length;
 
     syncStage(s.players.map((p) => {
       const forward = !!(g && g.phase === "reveal" && p.choice === 1);
       let st = "", cls = "";
-      if (g && g.phase === "answering") { st = p.choice >= 0 ? "READY" : "thinking…"; cls = p.choice >= 0 ? "ready" : "wait"; }
+      if (g && g.phase === "answering") { st = p.choice >= 0 ? "READY" : "…"; cls = p.choice >= 0 ? "ready" : "wait"; }
       else if (forward) { st = "ME!"; cls = "me"; }
       return Object.assign({}, p, { forward, st, cls });
     }));
 
     const n = s.players.length;
-    const decided = s.players.filter((p) => p.choice >= 0).length;
-    const fwd = s.players.filter((p) => p.choice === 1);
-    const full = g && g.question ? "Step forward if you have " + g.question : "Step forward if you have…";
-
-    // banner
-    let label = "Party game", sub = "";
-    if (!g) {
-      sub = mine.role === "player" || n > 0
-        ? "Waiting for someone to be the Question Master."
-        : "Pick a name, then join the stage or run the questions.";
-      if (n > 0) label = n + " on stage";
-    } else if (g.phase === "waiting") {
-      label = "Between rounds";
-      sub = g.isMe ? "Type a question below, or tap Random." : g.name + " is picking the next question.";
-      if (n === 0) sub = g.isMe ? "Waiting for players to join. Send the invite link." : sub;
-    } else if (g.phase === "answering") {
-      label = "Decide now";
-      sub = decided + " of " + n + " decided";
-    } else {
-      label = "Revealed";
-      sub = fwd.length + " stepped forward · " + (n - fwd.length) + " stayed";
-    }
-    $("phaseLabel").textContent = label;
-    $("q").textContent = full;
-    $("sub").textContent = sub;
-    drawBoard(g && g.question && g.phase !== "waiting" ? full : "Step forward if you have…");
-
-    // which tray
+    const fwdP = s.players.filter((p) => p.choice === 1);
+    const stayP = s.players.filter((p) => p.choice === 0);
+    const waitP = s.players.filter((p) => p.choice < 0);
+    const decided = n - waitP.length;
+    const active = !!(g && g.question && g.phase !== "waiting");
     const role = mine.role || null;
+
+    // ----- HUD -----
+    setSteps(g ? g.phase : "none");
+    $("qText").textContent = active ? g.question
+      : !g ? "Waiting for a host"
+      : g.isMe ? "Your question goes here" : "Next question coming up";
+    $("meter").hidden = !(g && g.phase === "answering");
+    $("meterFill").style.width = (n ? Math.round(decided / n * 100) : 0) + "%";
+    const sub = $("sub");
+    if (!g) setRich(sub, n ? [{ b: String(n) }, " on stage · someone needs to host"] : ["Pick a name, then play or host."]);
+    else if (g.phase === "waiting") setRich(sub, g.isMe ? (n ? [{ b: String(n) }, " on stage · pick a question below"] : ["Invite friends to fill the stage"]) : [{ b: g.name }, " is choosing a question"]);
+    else if (g.phase === "answering") setRich(sub, [{ b: decided + " of " + n }, " decided"]);
+    else setRich(sub, [{ b: String(fwdP.length) }, " stepped forward · " + stayP.length + " stayed"]);
+    drawBoard(active ? "Step forward if you have " + g.question : "Step forward if you have…");
+
+    // ----- which sheet -----
     $("lobby").hidden = !!role;
     $("qmPanel").hidden = role !== "qm";
     $("playerPanel").hidden = role !== "player";
 
-    // lobby
+    // ----- lobby -----
     const canLive = !!room && !roomDead && live;
     $("joinBtn").disabled = !canLive;
     $("qmBtn").disabled = !canLive || !!s.otherQm;
+    $("qmBtnSub").textContent = s.otherQm ? g.name + " is hosting" : "Ask the questions";
     let note;
-    if (!room || roomDead) note = deadReason || "Live play is unavailable right now. You can still practice with bots.";
+    if (!room || roomDead) note = deadReason || "Live play is unavailable right now. Practice with bots instead.";
     else if (!live) note = "Connecting to the live stage…";
-    else if (s.otherQm) note = g.name + " is the Question Master. Join the stage to play.";
-    else if (derive().players.length === 0) note = "Send the invite link to friends. Everyone in this room plays together.";
-    else note = "Nobody is asking questions yet. Be the Question Master, or join the stage and wait.";
+    else if (s.otherQm) note = g.name + " is hosting. Tap Play to join in.";
+    else if (n === 0) note = "Tap the room code at the top to invite friends.";
+    else note = n + " on stage and nobody is hosting yet.";
     $("lobbyNote").textContent = note;
 
-    // question master tray
+    // ----- host -----
     if (role === "qm") {
       const ph = g && g.isMe ? g.phase : "waiting";
-      $("askBtn").disabled = ph === "answering" || s.blockedQm;
-      $("revealBtn").disabled = ph !== "answering" || s.blockedQm;
-      $("nextBtn").disabled = ph !== "reveal" || s.blockedQm;
-      const tally = $("tally"); tally.replaceChildren();
-      const row = (k, v) => { const dt = document.createElement("dt"); dt.textContent = k; const dd = document.createElement("dd"); dd.textContent = v; tally.append(dt, dd); };
-      const names = (arr) => arr.length ? arr.map((p) => p.name).join(", ") : "—";
-      if (s.blockedQm) row("Note", (g ? g.name : "Someone") + " is already Question Master.");
-      else if (ph === "waiting") row("On stage", n ? names(s.players) : "nobody yet");
-      else {
-        row("Forward", names(fwd));
-        row("Stay", names(s.players.filter((p) => p.choice === 0)));
-        row("Deciding", names(s.players.filter((p) => p.choice < 0)));
-      }
+      $("qmTitle").textContent = s.blockedQm ? "Someone else is hosting" : ph === "waiting" ? "Ask the room" : ph === "answering" ? "Waiting for answers" : "The reveal";
+      $("qmAsk").hidden = ph !== "waiting";
+      $("qmLive").hidden = ph === "waiting";
+      $("stFwd").textContent = fwdP.length; $("stStay").textContent = stayP.length; $("stWait").textContent = waitP.length;
+      const nm = $("qmNames");
+      if (s.blockedQm) setRich(nm, [{ b: g ? g.name : "Someone" }, " is already hosting this room."]);
+      else if (ph === "answering") setRich(nm, n === 0 ? ["Nobody on stage yet."] : waitP.length ? ["Still deciding: ", { b: list(waitP) }] : ["Everyone has decided. Reveal when ready."]);
+      else if (ph === "reveal") setRich(nm, fwdP.length ? ["Stepped forward: ", { b: list(fwdP) }] : ["Nobody stepped forward this time."]);
+      updateQmAction();
     }
 
-    // player tray
+    // ----- player -----
     if (role === "player") {
-      const canPick = !!(g && g.phase === "answering");
-      const myPick = g && mine.round === g.round ? mine.choice : null;
-      $("fwdBtn").disabled = !canPick; $("stayBtn").disabled = !canPick;
+      const ph = g ? g.phase : "none";
+      const myPick = g && mine.round === g.round && (mine.choice === 0 || mine.choice === 1) ? mine.choice : null;
+      $("plWait").hidden = !(ph === "none" || ph === "waiting");
+      $("choices").hidden = ph !== "answering";
+      $("plResult").hidden = ph !== "reveal";
+      $("plTitle").textContent = ph === "none" ? "No host yet" : ph === "waiting" ? "Get ready" : ph === "answering" ? "Be honest!" : "Revealed";
+      $("plWaitText").textContent = ph === "none" ? "Nobody is hosting. Tap Leave, then Host, to run the game." : g.name + " is choosing a question…";
       $("fwdBtn").setAttribute("aria-pressed", String(myPick === 1));
       $("stayBtn").setAttribute("aria-pressed", String(myPick === 0));
-      let pn;
-      if (!g) pn = "No Question Master yet. Tap Leave and pick Be Question Master to run it.";
-      else if (g.phase === "waiting") pn = g.name + " is picking a question. Get ready.";
-      else if (g.phase === "answering") pn = myPick == null ? "Be honest. Nobody sees your choice until the reveal." : "Locked in. You can still switch before the reveal.";
-      else pn = myPick === 1 ? "You stepped forward." : myPick === 0 ? "You stayed back." : "You sat this one out.";
-      $("playerNote").textContent = pn;
+      $("choices").classList.toggle("dim", myPick !== null);
+      const big = $("plResultBig");
+      big.textContent = myPick === 1 ? "You stepped forward" : myPick === 0 ? "You stayed" : "You sat this one out";
+      big.className = "big " + (myPick === 1 ? "go" : myPick === 0 ? "stay" : "");
+      $("plResultSub").textContent = fwdP.length + " of " + n + " stepped forward";
+      $("plHint").textContent = ph === "answering" ? (myPick === null ? "Your choice stays hidden until the reveal." : "Locked in. You can still switch before the reveal.") : ph === "reveal" ? "Next question coming up." : "";
+      $("plHint").hidden = !$("plHint").textContent;
     }
 
-    // connection pill
-    const conn = $("conn");
+    // ----- connection chip -----
     let ct;
     if (practice) ct = "Practice";
     else if (!room || roomDead) ct = "Offline";
     else if (!live) ct = "Connecting…";
-    else { const here = room.peers().length; ct = "Room " + ROOM + " · " + here + " here"; }
-    conn.classList.toggle("live", practice || (!!room && !roomDead && live));
-    soundHook(s);
+    else { const here = room.peers().length; ct = here + (here === 1 ? " player" : " players"); }
+    $("conn").classList.toggle("live", practice || canLive);
     $("connText").textContent = ct;
+    $("roomChip").disabled = practice;
+
+    soundHook(s);
+    frame();
+  }
+
+  function updateQmAction() {
+    const s = lastState;
+    if (!s || mine.role !== "qm") return;
+    const g = s.game, ph = g && g.isMe ? g.phase : "waiting";
+    const btn = $("qmAction");
+    btn.disabled = !!s.blockedQm;
+    btn.replaceChildren();
+    if (ph === "waiting") btn.textContent = $("qIn").value.trim() ? "Ask the room" : "Ask a random one";
+    else if (ph === "answering") {
+      const n = s.players.length, decided = s.players.filter((p) => p.choice >= 0).length;
+      btn.appendChild(document.createTextNode("Reveal"));
+      const c = document.createElement("span"); c.className = "count"; c.textContent = decided + "/" + n; btn.appendChild(c);
+    } else btn.textContent = "Next question";
   }
 
   // ---------- actions ----------
   function joinStage() {
+    sfx.play("click"); buzz(10);
     setMine({ role: "player", name: myName(), look: myLook, choice: null, round: null, phase: null, question: null });
   }
   function becomeQm() {
+    sfx.play("click"); buzz(10);
+    reshuffle();
     setMine({ role: "qm", name: myName(), look: myLook, phase: "waiting", question: "", round: Date.now(), choice: null });
   }
   function leave() {
     sfx.play("leave");
     if (practice) {
       practice = false; bots = []; botTimers.forEach(clearTimeout); botTimers = [];
-      mine = {}; render(); return;
+      mine = {}; prevPlayers = null; render(); return;
     }
     setMine({ role: null, name: null, look: null, choice: null, round: null, phase: null, question: null });
   }
-  let lastQ = -1;
-  function randomQ() {
-    let i = Math.floor(Math.random() * QUESTIONS.length);
-    if (i === lastQ) i = (i + 1) % QUESTIONS.length;
-    lastQ = i; return QUESTIONS[i];
+  let leaveArmed = null;
+  function leaveClicked(btn) {
+    const needConfirm = mine.role === "qm" && !practice && lastState && lastState.players.length > 0;
+    if (needConfirm && leaveArmed !== btn) {
+      leaveArmed = btn; btn.textContent = "Tap again to end"; btn.classList.add("warn"); buzz(15);
+      setTimeout(() => { if (leaveArmed === btn) { leaveArmed = null; btn.textContent = "Leave"; btn.classList.remove("warn"); } }, 3000);
+      return;
+    }
+    leaveArmed = null; btn.textContent = "Leave"; btn.classList.remove("warn");
+    leave();
   }
+  const randomQ = () => QUESTIONS[Math.floor(Math.random() * QUESTIONS.length)];
   function ask() {
     let text = $("qIn").value.replace(/^\s*step forward if you have\s*/i, "").trim().slice(0, 120);
     if (!text) text = randomQ();
-    $("qIn").value = "";
+    $("qIn").value = ""; $("qIn").blur();
     const round = Date.now();
     setMine({ phase: "answering", question: text, round });
     if (practice) runBots(round);
   }
+  function hostAction() {
+    const s = lastState; if (!s) return;
+    const g = s.game, ph = g && g.isMe ? g.phase : "waiting";
+    if (ph === "waiting") ask();
+    else if (ph === "answering") setMine({ phase: "reveal" });
+    else { botTimers.forEach(clearTimeout); reshuffle(); setMine({ phase: "waiting", question: "" }); }
+  }
   function choose(c) {
-    sfx.play("click");
     const g = derive().game;
     if (!g || g.phase !== "answering") return;
+    sfx.play("click"); buzz(15);
     setMine({ choice: c, round: g.round });
   }
+  function invite() {
+    if (practice) return;
+    sfx.play("click");
+    const url = location.href.split("#")[0] + "#" + ROOM;
+    if (navigator.share) { navigator.share({ title: "Step Forward", text: "Join my Step Forward game, room " + ROOM, url }).catch(() => {}); return; }
+    const fallback = () => window.prompt("Copy this invite link:", url);
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(() => toast("Invite link copied"), fallback);
+    else fallback();
+  }
 
-  // practice mode: you ask, bots answer
+  // practice mode: you host, bots answer
   function startPractice() {
-    practice = true;
+    sfx.play("click");
+    practice = true; prevPlayers = null;
+    reshuffle();
     mine = { role: "qm", name: myName(), look: myLook, phase: "waiting", question: "", round: 1 };
     bots = BOT_NAMES.map((name, i) => ({ peer: "b" + i, p: { role: "player", name, look: (myLook + 7 + i * 11) % 60, choice: null, round: null } }));
     render();
@@ -810,7 +1114,7 @@
         if (!practice || mine.round !== round) return;
         b.p = Object.assign({}, b.p, { choice: Math.random() < 0.5 ? 1 : 0, round });
         render();
-      }, 600 + Math.random() * 2600));
+      }, 700 + Math.random() * 3000));
     });
     render();
   }
@@ -818,17 +1122,19 @@
   $("joinBtn").addEventListener("click", joinStage);
   $("qmBtn").addEventListener("click", becomeQm);
   $("practiceBtn").addEventListener("click", startPractice);
-  $("qmLeave").addEventListener("click", leave);
-  $("playerLeave").addEventListener("click", leave);
-  $("randBtn").addEventListener("click", () => { sfx.play("click"); $("qIn").value = randomQ(); $("qIn").focus(); });
-  $("askBtn").addEventListener("click", ask);
-  $("qIn").addEventListener("keydown", (e) => { if (e.key === "Enter" && !$("askBtn").disabled) ask(); });
-  $("revealBtn").addEventListener("click", () => setMine({ phase: "reveal" }));
-  $("nextBtn").addEventListener("click", () => { botTimers.forEach(clearTimeout); setMine({ phase: "waiting", question: "" }); });
+  $("qmLeave").addEventListener("click", (e) => leaveClicked(e.currentTarget));
+  $("playerLeave").addEventListener("click", (e) => leaveClicked(e.currentTarget));
+  $("qmAction").addEventListener("click", () => { sfx.play("click"); hostAction(); });
+  $("qIn").addEventListener("input", () => { drawSugg(); updateQmAction(); });
+  $("qIn").addEventListener("keydown", (e) => { if (e.key === "Enter" && !$("qmAction").disabled) { e.preventDefault(); hostAction(); } });
+  $("nameIn").addEventListener("keydown", (e) => { if (e.key === "Enter") e.currentTarget.blur(); });
+  $("nameIn").addEventListener("change", () => { const n = myName(); if (mine.role) setMine({ name: n }); });
   $("fwdBtn").addEventListener("click", () => choose(1));
   $("stayBtn").addEventListener("click", () => choose(0));
-  $("nameIn").addEventListener("change", () => { const n = myName(); if (mine.role) setMine({ name: n }); });
+  $("roomChip").addEventListener("click", invite);
+  $("qmInvite").addEventListener("click", invite);
 
+  reshuffle();
   render();
   if (document.fonts && document.fonts.load) {
     document.fonts.load("80px Bungee").then(() => { boardKey = null; drawFloor(); render(); }).catch(() => {});
@@ -854,13 +1160,7 @@
     const c = (location.hash || "").replace("#", "").toUpperCase();
     if (/^[A-Z0-9]{4,8}$/.test(c) && c !== ROOM) joinRoom(c);
   });
-  $("newRoomBtn").addEventListener("click", () => joinRoom(newCode()));
-  $("copyBtn").addEventListener("click", () => {
-    const url = location.href.split("#")[0] + "#" + ROOM;
-    const done = () => { $("copyBtn").textContent = "Copied"; setTimeout(() => { $("copyBtn").textContent = "Copy invite link"; }, 1600); };
-    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, () => window.prompt("Copy this link:", url));
-    else window.prompt("Copy this link:", url);
-  });
+  $("newRoomBtn").addEventListener("click", () => { sfx.play("click"); joinRoom(newCode()); toast("New room " + ROOM); });
 })();
 </script>
 </body>
