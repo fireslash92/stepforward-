@@ -1,0 +1,773 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Step Forward Stage</title>
+<meta name="description" content="Live 3D party game: step forward if you have…">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Rubik:wght@400;500;700&display=swap">
+<style>
+  /* Layout: full-bleed 3D stage, a marquee banner on top, one control tray docked at the bottom. */
+  :root {
+    --night: #150f2b;
+    --stage: #3a2468;
+    --ink: #f6f1ff;
+    --muted: #b9acd9;
+    --marquee: #ffd23f;
+    --go: #3fbf7f;
+    --stay: #ff6b8b;
+    --tray: rgba(26, 18, 52, 0.92);
+    --line: rgba(255, 255, 255, 0.12);
+    --display: "Bungee", "Impact", "Arial Black", sans-serif;
+    --body: "Rubik", "Segoe UI", system-ui, sans-serif;
+    color-scheme: dark;
+  }
+  html, body { height: 100%; }
+  :root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0;
+    background: var(--night);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 15px;
+    overflow: hidden;
+  }
+  #app { position: relative; height: 100%; overflow: hidden; }
+  #scene { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #tags { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .tag {
+    position: absolute; left: 0; top: 0;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    white-space: nowrap; will-change: transform;
+  }
+  .tag .nm {
+    font: 700 12px/1 var(--body);
+    padding: 4px 8px; border-radius: 999px;
+    background: rgba(10, 6, 24, 0.72); color: var(--ink);
+  }
+  .tag.me .nm { background: var(--marquee); color: #241640; }
+  .tag .st { font: 400 11px/1 var(--display); letter-spacing: 0.04em; padding: 3px 7px; border-radius: 4px; }
+  .tag .st:empty { display: none; }
+  .tag .st.wait { color: var(--muted); background: rgba(10, 6, 24, 0.6); }
+  .tag .st.ready { color: #0e2a1c; background: var(--go); }
+  .tag .st.me { color: #241640; background: var(--marquee); }
+
+  #banner {
+    position: absolute; top: 10px; left: 0; right: 0;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    display: flex; justify-content: center; pointer-events: none;
+  }
+  .marquee {
+    width: 100%; max-width: 760px;
+    background: var(--tray); border: 1px solid var(--line);
+    border-radius: 14px; padding: 12px 16px 14px;
+    text-align: center; pointer-events: auto;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  }
+  .eyebrow {
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted);
+  }
+  .pill { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #776a99; }
+  .pill.live .dot { background: var(--go); box-shadow: 0 0 8px var(--go); }
+  #q {
+    margin: 8px 0 4px;
+    font: 400 clamp(19px, 4.6vw, 30px)/1.15 var(--display);
+    color: var(--marquee); text-wrap: balance;
+  }
+  #sub { margin: 0; color: var(--ink); font-size: 14px; font-variant-numeric: tabular-nums; }
+
+  .tray {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-bottom: max(12px, env(safe-area-inset-bottom, 0px));
+    display: flex; justify-content: center;
+  }
+  .panel {
+    width: 100%; max-width: 560px;
+    background: var(--tray); border: 1px solid var(--line);
+    border-radius: 16px; padding: 16px;
+    display: flex; flex-direction: column; gap: 12px;
+    box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.35);
+  }
+  .panel h2 { margin: 0; font: 400 15px/1.2 var(--display); letter-spacing: 0.03em; color: var(--marquee); }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .row > * { flex: 1 1 140px; min-width: 0; }
+  label.lbl { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
+  input[type=text] {
+    width: 100%; box-sizing: border-box;
+    font: 500 16px var(--body); color: var(--ink);
+    background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line);
+    border-radius: 10px; padding: 12px 12px;
+  }
+  input[type=text]:focus-visible { outline: 2px solid var(--marquee); outline-offset: 1px; }
+  button {
+    font: 700 15px var(--body); color: var(--ink);
+    background: rgba(255, 255, 255, 0.08); border: 1px solid var(--line);
+    border-radius: 10px; padding: 12px 14px; min-height: 48px; cursor: pointer;
+  }
+  button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.14); }
+  button:focus-visible { outline: 2px solid var(--marquee); outline-offset: 2px; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.primary { background: var(--marquee); color: #241640; border-color: transparent; }
+  button.primary:hover:not(:disabled) { background: #ffe07a; }
+  button.big { font: 400 18px var(--display); min-height: 72px; letter-spacing: 0.02em; }
+  button.fwd { background: rgba(63, 191, 127, 0.16); border-color: rgba(63, 191, 127, 0.5); }
+  button.fwd[aria-pressed=true] { background: var(--go); color: #0e2a1c; }
+  button.stay { background: rgba(255, 107, 139, 0.14); border-color: rgba(255, 107, 139, 0.45); }
+  button.stay[aria-pressed=true] { background: var(--stay); color: #3a0d1a; }
+  button.link { background: none; border: none; min-height: 0; padding: 4px 0; color: var(--muted); font-weight: 500; text-decoration: underline; text-underline-offset: 3px; flex: 0 0 auto; }
+  .note { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+  .tally { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size: 13px; margin: 0; }
+  .tally dt { color: var(--muted); }
+  .tally dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+  .split { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .split .note { flex: 1; min-width: 0; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  .roomline { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--muted); }
+  .roomline b { font: 400 16px var(--display); color: var(--marquee); letter-spacing: 0.08em; }
+  .roomline button { min-height: 36px; padding: 6px 12px; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <canvas id="scene" aria-label="3D stage with the players"></canvas>
+  <div id="tags"></div>
+
+  <header id="banner">
+    <div class="marquee">
+      <div class="eyebrow">
+        <span id="phaseLabel">Party game</span>
+        <span class="pill" id="conn"><span class="dot"></span><span id="connText">Connecting…</span></span>
+      </div>
+      <h1 id="q">Step forward if you have…</h1>
+      <p id="sub">Pick a name, then join the stage or run the questions.</p>
+    </div>
+  </header>
+
+  <div class="tray">
+    <section class="panel" id="lobby">
+      <h2>Join the game</h2>
+      <div class="roomline">
+        <span>Room <b id="roomCode">----</b></span>
+        <span class="row" style="flex: 0 0 auto; gap: 6px">
+          <button id="copyBtn">Copy invite link</button>
+          <button id="newRoomBtn">New room</button>
+        </span>
+      </div>
+      <div>
+        <label class="lbl" for="nameIn">Your name</label>
+        <input type="text" id="nameIn" maxlength="16" autocomplete="nickname" placeholder="e.g. Maya">
+      </div>
+      <div class="row">
+        <button class="primary" id="joinBtn">Join the stage</button>
+        <button id="qmBtn">Be Question Master</button>
+      </div>
+      <div class="split">
+        <p class="note" id="lobbyNote">Everyone with this link plays together live.</p>
+        <button class="link" id="practiceBtn">Practice with bots</button>
+      </div>
+    </section>
+
+    <section class="panel" id="qmPanel" hidden>
+      <div class="split"><h2>You're the Question Master</h2><button class="link" id="qmLeave">Leave</button></div>
+      <div>
+        <label class="lbl" for="qIn">Step forward if you have…</label>
+        <div class="row">
+          <input type="text" id="qIn" maxlength="120" placeholder="ever seen snow" style="flex: 3 1 180px">
+          <button id="randBtn" style="flex: 1 1 90px">Random</button>
+        </div>
+      </div>
+      <div class="row">
+        <button class="primary" id="askBtn">Ask</button>
+        <button id="revealBtn">Reveal!</button>
+        <button id="nextBtn">Next round</button>
+      </div>
+      <dl class="tally" id="tally"></dl>
+    </section>
+
+    <section class="panel" id="playerPanel" hidden>
+      <div class="row">
+        <button class="big fwd" id="fwdBtn" aria-pressed="false">Step forward</button>
+        <button class="big stay" id="stayBtn" aria-pressed="false">Stay</button>
+      </div>
+      <div class="split">
+        <p class="note" id="playerNote">Waiting for the Question Master.</p>
+        <button class="link" id="playerLeave">Leave</button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+  // Firebase project for live play. databaseURL is on the Realtime Database page in the Firebase console.
+  window.FIREBASE_CONFIG = {
+    apiKey: "AIzaSyAeYosB42eJFxrphNPUkvWHahLuxNCfmHw",
+    authDomain: "step-17cae.firebaseapp.com",
+    databaseURL: "https://step-17cae-default-rtdb.firebaseio.com",
+    projectId: "step-17cae",
+    storageBucket: "step-17cae.firebasestorage.app",
+    messagingSenderId: "743172573085",
+    appId: "1:743172573085:web:a272928a43076bb5881174"
+  };
+</script>
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+
+  const QUESTIONS = [
+    "a pet at home", "ever broken a bone", "been on a plane", "a brother or sister",
+    "ever sung karaoke", "eaten sushi", "seen real snow", "met someone famous",
+    "lived in another country", "a nickname", "ever lost your phone",
+    "learned a musical instrument", "been to a concert", "stayed up all night",
+    "cooked a full meal by yourself", "ridden a horse", "swum in the sea",
+    "won a trophy or medal", "ever gotten lost in a city", "read a whole book this year",
+    "climbed a mountain", "more than 100 photos of food on your phone",
+    "ever laughed at the wrong moment", "a birthday this month",
+    "ever fallen asleep in a cinema", "tried a food you couldn't pronounce",
+    "ever waved back at someone who wasn't waving at you", "a secret talent",
+  ];
+  const SHIRTS = ["#e63946","#f4a261","#2a9d8f","#457b9d","#9b5de5","#f15bb5","#00bbf9","#8ac926","#ffca3a","#ff595e","#6a4c93","#1982c4"];
+  const SKINS = ["#ffdbac","#f1c27d","#e0ac69","#c68642","#8d5524"];
+  const HAIRS = ["#2b1d14","#6b3e26","#d4a017","#1a1a1a","#b5523b","#8a8a8a"];
+  const BOT_NAMES = ["Maya","Omar","Leo","Sara","Kai","Noor"];
+  const BASE_Z = 0, FORWARD_Z = 3.2, LINE_Z = 1.6, WALK = 3.5;
+
+  // ---------- local identity (per browser convenience) ----------
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+  };
+  let myLook = parseInt(store.get("sf-look"), 10);
+  if (!Number.isFinite(myLook)) { myLook = Math.floor(Math.random() * 60); store.set("sf-look", String(myLook)); }
+  $("nameIn").value = store.get("sf-name") || "";
+
+  const clean = (v, fb) => {
+    const s = String(v == null ? "" : v).replace(/[\u0000-\u001f]/g, "").trim().slice(0, 16);
+    return s || fb;
+  };
+
+  // ---------- pixel-art sprites (two frames: idle, cheering) ----------
+  const hex = (h) => [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)];
+  const dark = (c, f) => c.map((v) => Math.round(v * (1 - f)));
+  const light = (c, f) => c.map((v) => Math.round(v + (255 - v) * f));
+
+  function frameTexture(look, cheer) {
+    const W = 32, H = 48;
+    const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+    const ctx = cv.getContext("2d");
+    const img = ctx.createImageData(W, H), d = img.data;
+    const set = (x, y, c) => { if (x < 0 || y < 0 || x >= W || y >= H) return; const i = (y * W + x) * 4; d[i] = c[0]; d[i+1] = c[1]; d[i+2] = c[2]; d[i+3] = 255; };
+    const rect = (x0, y0, x1, y1, c) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) set(x, y, c); };
+    const shirt = hex(SHIRTS[look % SHIRTS.length]);
+    const skin = hex(SKINS[(look * 7 + 3) % SKINS.length]);
+    const hair = hex(HAIRS[(look * 5 + 1) % HAIRS.length]);
+    const pants = dark(shirt, 0.55), shoe = [34,34,34], blk = [0,0,0], mouth = [122,31,43];
+    rect(11,38,14,44,pants); rect(17,38,20,44,pants); rect(10,45,14,46,shoe); rect(17,45,21,46,shoe);
+    if (cheer) { rect(5,12,7,25,shirt); rect(24,12,26,25,shirt); rect(5,9,7,11,skin); rect(24,9,26,11,skin); }
+    else { rect(5,24,7,35,shirt); rect(24,24,26,35,shirt); rect(5,36,7,38,skin); rect(24,36,26,38,skin); }
+    rect(10,22,21,22,shirt); rect(9,23,22,38,shirt); rect(9,30,22,31,light(shirt,0.35)); rect(14,20,17,22,skin);
+    for (let y = 2; y < 22; y++) for (let x = 6; x < 26; x++) {
+      const dx = x - 15.5, dy = y - 12;
+      if (Math.hypot(dx, dy) <= 8.3) set(x, y, (y <= 7 || (y <= 11 && Math.abs(dx) >= 6)) ? hair : skin);
+    }
+    rect(12,11,13,13,blk); rect(18,11,19,13,blk);
+    set(11,15,dark(skin,0.15)); set(20,15,dark(skin,0.15));
+    if (cheer) rect(14,15,17,17,mouth); else { set(13,16,mouth); rect(14,17,17,17,mouth); set(18,16,mouth); }
+    // outline pass
+    const alpha = new Uint8Array(W * H); for (let i = 0; i < W * H; i++) alpha[i] = d[i*4+3];
+    const ol = [27,27,47];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      if (alpha[y*W+x]) continue;
+      if ((x+1 < W && alpha[y*W+x+1]) || (x > 0 && alpha[y*W+x-1]) || (y+1 < H && alpha[(y+1)*W+x]) || (y > 0 && alpha[(y-1)*W+x])) set(x, y, ol);
+    }
+    ctx.putImageData(img, 0, 0);
+    const t = new THREE.CanvasTexture(cv);
+    t.magFilter = THREE.NearestFilter; t.minFilter = THREE.NearestFilter; t.generateMipmaps = false;
+    return t;
+  }
+
+  // ---------- 3D stage ----------
+  const canvas = $("scene");
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color("#150f2b");
+  scene.fog = new THREE.Fog("#150f2b", 20, 45);
+  const camera = new THREE.PerspectiveCamera(52, 1, 0.1, 200);
+  const lookAt = new THREE.Vector3(0, 1.3, 1);
+
+  scene.add(new THREE.AmbientLight(0xc9b8ff, 0.65));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.85); sun.position.set(-5, 10, 8); scene.add(sun);
+
+  function box(w, h, dpt, x, y, z, color, basic) {
+    const mat = basic ? new THREE.MeshBasicMaterial({ color }) : new THREE.MeshLambertMaterial({ color });
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, dpt), mat);
+    m.position.set(x, y, z); scene.add(m); return m;
+  }
+  box(70, 0.2, 70, 0, -0.32, 0, "#231b3d");
+  box(22, 0.3, 9, 0, -0.15, 1.8, "#c99a5b");
+  const zone = box(22, 0.02, 3, 0, 0.01, FORWARD_Z + 0.3, "#3fbf7f");
+  zone.material.transparent = true; zone.material.opacity = 0.55;
+  box(22, 0.04, 0.2, 0, 0.03, LINE_Z, "#ffd23f", true);
+  box(24, 7, 0.4, 0, 3.2, -3.6, "#3a2468");
+
+  // question board on the back wall
+  const boardCv = document.createElement("canvas"); boardCv.width = 1024; boardCv.height = 384;
+  const boardTex = new THREE.CanvasTexture(boardCv);
+  const board = new THREE.Mesh(new THREE.PlaneGeometry(16, 6), new THREE.MeshBasicMaterial({ map: boardTex }));
+  board.position.set(0, 3.5, -3.38); scene.add(board);
+  let boardKey = null;
+  function drawBoard(text) {
+    if (boardKey === text) return; boardKey = text;
+    const c = boardCv.getContext("2d"), W = boardCv.width, H = boardCv.height;
+    const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, "#2a1a52"); g.addColorStop(1, "#1a1036");
+    c.fillStyle = g; c.fillRect(0, 0, W, H);
+    c.strokeStyle = "#ffd23f"; c.lineWidth = 10; c.strokeRect(14, 14, W - 28, H - 28);
+    c.fillStyle = "#ffd23f"; c.textAlign = "center"; c.textBaseline = "middle";
+    const words = text.toUpperCase().split(/\s+/);
+    let size = 84, lines;
+    for (; size >= 34; size -= 4) {
+      c.font = `${size}px Bungee, Impact, sans-serif`;
+      lines = []; let cur = "";
+      for (const w of words) { const t = cur ? cur + " " + w : w; if (c.measureText(t).width > W - 110 && cur) { lines.push(cur); cur = w; } else cur = t; }
+      if (cur) lines.push(cur);
+      if (lines.length * size * 1.15 <= H - 90) break;
+    }
+    const lh = size * 1.15, top = H / 2 - (lines.length - 1) * lh / 2;
+    lines.forEach((l, i) => c.fillText(l, W / 2, top + i * lh));
+    boardTex.needsUpdate = true;
+  }
+
+  // floor lettering
+  const floorCv = document.createElement("canvas"); floorCv.width = 1024; floorCv.height = 128;
+  const floorTex = new THREE.CanvasTexture(floorCv);
+  const floorLbl = new THREE.Mesh(new THREE.PlaneGeometry(10, 1.25), new THREE.MeshBasicMaterial({ map: floorTex, transparent: true, opacity: 0.8 }));
+  floorLbl.rotation.x = -Math.PI / 2; floorLbl.position.set(0, 0.045, FORWARD_Z + 1.25); scene.add(floorLbl);
+  function drawFloor() {
+    const c = floorCv.getContext("2d"); c.clearRect(0, 0, 1024, 128);
+    c.fillStyle = "#ffffff"; c.textAlign = "center"; c.textBaseline = "middle";
+    c.font = "88px Bungee, Impact, sans-serif"; c.fillText("STEP FORWARD", 512, 68);
+    floorTex.needsUpdate = true;
+  }
+  drawFloor();
+
+  // marquee bulbs
+  const bulbOn = new THREE.MeshBasicMaterial({ color: "#ffe680" });
+  const bulbOff = new THREE.MeshBasicMaterial({ color: "#6a5a2a" });
+  const bulbGeo = new THREE.SphereGeometry(0.14, 10, 8);
+  const bulbs = [];
+  const addBulb = (x, y) => { const b = new THREE.Mesh(bulbGeo, bulbOff); b.position.set(x, y, -3.34); scene.add(b); bulbs.push(b); };
+  for (let i = 0; i <= 28; i++) addBulb(-11.2 + i * 0.8, 6.65);
+  for (let i = 5; i >= 0; i--) addBulb(11.6, 0.8 + i * 1.0);
+  for (let i = 0; i <= 5; i++) addBulb(-11.6, 0.8 + i * 1.0);
+
+  // ---------- avatars ----------
+  const tagsEl = $("tags");
+  const avatars = new Map();
+  function makeAvatar(look) {
+    const g = new THREE.Group();
+    const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.55, 24), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35 }));
+    shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.035; g.add(shadow);
+    const frames = [frameTexture(look, false), frameTexture(look, true)];
+    const mat = new THREE.MeshBasicMaterial({ map: frames[0], transparent: true, alphaTest: 0.5 });
+    const spr = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 2.4), mat);
+    spr.position.y = 1.2; g.add(spr);
+    g.position.set((Math.random() - 0.5) * 12, 0, -2.6);
+    scene.add(g);
+    const tag = document.createElement("div"); tag.className = "tag";
+    const nm = document.createElement("span"); nm.className = "nm";
+    const st = document.createElement("span"); st.className = "st";
+    tag.append(st, nm); tagsEl.appendChild(tag);
+    return { g, spr, mat, frames, tag, nm, st, look, target: new THREE.Vector3(), seed: Math.random() * 10 };
+  }
+  function dropAvatar(key) {
+    const a = avatars.get(key); if (!a) return;
+    scene.remove(a.g); a.frames.forEach((t) => t.dispose()); a.mat.dispose(); a.tag.remove();
+    avatars.delete(key);
+  }
+  function syncStage(list) {
+    const keep = new Set(list.map((p) => p.key));
+    for (const k of [...avatars.keys()]) if (!keep.has(k)) dropAvatar(k);
+    const n = list.length, spacing = Math.min(1.9, 19 / Math.max(n, 1));
+    list.forEach((p, i) => {
+      let a = avatars.get(p.key);
+      if (a && a.look !== p.look) { dropAvatar(p.key); a = null; }
+      if (!a) { a = makeAvatar(p.look); avatars.set(p.key, a); }
+      a.target.set((i - (n - 1) / 2) * spacing, 0, p.forward ? FORWARD_Z : BASE_Z);
+      a.mat.map = a.frames[p.forward ? 1 : 0];
+      a.nm.textContent = p.isMe ? p.name + " (you)" : p.name;
+      a.tag.classList.toggle("me", !!p.isMe);
+      a.st.textContent = p.st; a.st.className = "st " + p.cls;
+    });
+  }
+
+  // ---------- layout + loop ----------
+  function resize() {
+    const w = canvas.clientWidth || window.innerWidth, h = canvas.clientHeight || window.innerHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    const a = camera.aspect;
+    if (a < 1) { camera.position.set(0, 7.5 + (1 - a) * 6, 13 + (1 - a) * 18); lookAt.set(0, -0.6, 1); }
+    else { camera.position.set(0, 6.5, 13); lookAt.set(0, 1.1, 1); }
+    camera.lookAt(lookAt);
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  let phaseNow = "none";
+  const tmp = new THREE.Vector3();
+  let last = performance.now();
+  function tick(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    const t = now / 1000;
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    for (const a of avatars.values()) {
+      const p = a.g.position;
+      const dx = a.target.x - p.x, dz = a.target.z - p.z, dist = Math.hypot(dx, dz);
+      if (dist > 0.001) { const step = Math.min(dist, WALK * dt); p.x += dx / dist * step; p.z += dz / dist * step; }
+      p.y = dist > 0.02 ? Math.abs(Math.sin(t * 14 + a.seed)) * 0.25 : 0;
+      a.spr.position.y = 1.2 + Math.sin(t * 2.5 + a.seed) * 0.03;
+      a.spr.rotation.y = Math.atan2(camera.position.x - p.x, camera.position.z - p.z); // billboard around Y
+      tmp.set(p.x, p.y + 2.55, p.z).project(camera);
+      if (tmp.z > 1) { a.tag.style.visibility = "hidden"; continue; }
+      a.tag.style.visibility = "visible";
+      a.tag.style.transform = `translate(${(tmp.x * 0.5 + 0.5) * w}px, ${(-tmp.y * 0.5 + 0.5) * h}px) translate(-50%, -100%)`;
+    }
+    const speed = phaseNow === "reveal" ? 14 : phaseNow === "answering" ? 6 : 2.5;
+    const k = Math.floor(t * speed);
+    bulbs.forEach((b, i) => { b.material = (i + k) % 3 === 0 ? bulbOn : bulbOff; });
+    renderer.render(scene, camera);
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  // ---------- game state (shared through Firebase) ----------
+  // `room` is a small adapter so the rest of the page can treat Firebase like a list of peers.
+  let room = null, roomDead = false, live = false;
+  let practice = false, bots = [], botTimers = [];
+  let mine = {};
+  let db = null, gameRef = null, ROOM = "", fbQm = null, fbPlayers = {}, deadReason = "";
+  const ME = Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+
+  function fbPeers() {
+    const out = Object.entries(fbPlayers || {}).map(([id, v]) => ({ peer: id, sameTab: id === ME, presence: Object.assign({}, v, { role: "player" }) }));
+    if (fbQm && fbQm.owner) out.push({ peer: String(fbQm.owner), sameTab: fbQm.owner === ME, presence: Object.assign({}, fbQm, { role: "qm" }) });
+    return out;
+  }
+
+  function peersNow() {
+    if (practice) {
+      return [{ peer: "0-me", sameTab: true, presence: mine }]
+        .concat(bots.map((b) => ({ peer: b.peer, sameTab: false, presence: b.p })));
+    }
+    if (!room || roomDead) return [];
+    return room.peers();
+  }
+
+  function derive() {
+    const ps = peersNow().filter((p) => p.kind !== "agent");
+    const pres = (p) => (p.sameTab ? mine : (p.presence || {}));
+    const byPeer = (a, b) => (a.peer < b.peer ? -1 : a.peer > b.peer ? 1 : 0);
+    const qms = ps.filter((p) => pres(p).role === "qm").sort(byPeer);
+    const mineQm = qms.find((p) => p.sameTab);
+    const qmP = qms[0] || null;
+    let game = null;
+    if (qmP) {
+      const q = pres(qmP);
+      game = {
+        phase: ["waiting", "answering", "reveal"].includes(q.phase) ? q.phase : "waiting",
+        question: String(q.question || "").replace(/[\u0000-\u001f]/g, "").slice(0, 120),
+        round: q.round || 0,
+        name: clean(q.name, "Question Master"),
+        isMe: !!qmP.sameTab,
+      };
+    }
+    const players = ps.filter((p) => pres(p).role === "player").sort(byPeer).map((p) => {
+      const pr = pres(p);
+      const ok = game && pr.round === game.round && (pr.choice === 0 || pr.choice === 1);
+      return { key: p.peer, name: clean(pr.name, "Player"), look: Math.abs(pr.look | 0) % 60, choice: ok ? pr.choice : -1, isMe: !!p.sameTab };
+    });
+    return { game, players, otherQm: qmP && !qmP.sameTab, blockedQm: !!mineQm && qmP !== mineQm };
+  }
+
+  const stripRole = (o) => { const r = {}; for (const [k, v] of Object.entries(o)) if (k !== "role" && v !== null && v !== undefined) r[k] = v; return r; };
+
+  function pushMine() {
+    if (!gameRef || roomDead) return;
+    const playerRef = gameRef.child("players/" + ME), qmRef = gameRef.child("qm");
+    const ownQm = fbQm && fbQm.owner === ME;
+    if (mine.role === "player") {
+      playerRef.set(stripRole(mine)).catch(onDbError);
+      playerRef.onDisconnect().remove();
+      if (ownQm) qmRef.remove().catch(() => {});
+    } else if (mine.role === "qm") {
+      const val = Object.assign(stripRole(mine), { owner: ME });
+      qmRef.transaction((cur) => (cur && cur.owner && cur.owner !== ME ? undefined : val), (err, committed) => {
+        if (err) { onDbError(err); return; }
+        if (!committed && mine.role === "qm") { mine = {}; render(); return; }
+        qmRef.onDisconnect().remove();
+      });
+      playerRef.remove().catch(() => {});
+      playerRef.onDisconnect().cancel();
+    } else {
+      playerRef.remove().catch(() => {});
+      playerRef.onDisconnect().cancel();
+      if (ownQm) { qmRef.remove().catch(() => {}); qmRef.onDisconnect().cancel(); }
+    }
+  }
+
+  function setMine(patch) {
+    for (const [k, v] of Object.entries(patch)) { if (v === null) delete mine[k]; else mine[k] = v; }
+    if (!practice) pushMine();
+    render();
+  }
+
+  function onDbError(err) {
+    console.warn(err);
+    roomDead = true; live = false;
+    deadReason = "The live database refused the connection. Check the Realtime Database rules in Firebase.";
+    render();
+  }
+
+  const newCode = () => { const A = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let c = ""; for (let i = 0; i < 4; i++) c += A[Math.floor(Math.random() * A.length)]; return c; };
+
+  function joinRoom(code) {
+    if (gameRef) {
+      const prev = mine.role; mine = {}; pushMine(); if (prev) render();
+      gameRef.child("qm").off(); gameRef.child("players").off();
+    }
+    ROOM = code; fbQm = null; fbPlayers = {};
+    try { history.replaceState(null, "", "#" + code); } catch (e) { location.hash = code; }
+    $("roomCode").textContent = code;
+    if (!db) { render(); return; }
+    gameRef = db.ref("games/" + code);
+    gameRef.child("qm").on("value", (s) => { fbQm = s.val(); render(); }, onDbError);
+    gameRef.child("players").on("value", (s) => { fbPlayers = s.val() || {}; render(); }, onDbError);
+    render();
+  }
+
+  const myName = () => {
+    const n = clean($("nameIn").value, "");
+    if (n) store.set("sf-name", n);
+    return n || "Player " + (myLook % 90 + 10);
+  };
+
+  // ---------- rendering the UI ----------
+  function render() {
+    const s = derive(), g = s.game;
+    phaseNow = g ? g.phase : "none";
+
+    syncStage(s.players.map((p) => {
+      const forward = !!(g && g.phase === "reveal" && p.choice === 1);
+      let st = "", cls = "";
+      if (g && g.phase === "answering") { st = p.choice >= 0 ? "READY" : "thinking…"; cls = p.choice >= 0 ? "ready" : "wait"; }
+      else if (forward) { st = "ME!"; cls = "me"; }
+      return Object.assign({}, p, { forward, st, cls });
+    }));
+
+    const n = s.players.length;
+    const decided = s.players.filter((p) => p.choice >= 0).length;
+    const fwd = s.players.filter((p) => p.choice === 1);
+    const full = g && g.question ? "Step forward if you have " + g.question : "Step forward if you have…";
+
+    // banner
+    let label = "Party game", sub = "";
+    if (!g) {
+      sub = mine.role === "player" || n > 0
+        ? "Waiting for someone to be the Question Master."
+        : "Pick a name, then join the stage or run the questions.";
+      if (n > 0) label = n + " on stage";
+    } else if (g.phase === "waiting") {
+      label = "Between rounds";
+      sub = g.isMe ? "Type a question below, or tap Random." : g.name + " is picking the next question.";
+      if (n === 0) sub = g.isMe ? "Waiting for players to join. Send the invite link." : sub;
+    } else if (g.phase === "answering") {
+      label = "Decide now";
+      sub = decided + " of " + n + " decided";
+    } else {
+      label = "Revealed";
+      sub = fwd.length + " stepped forward · " + (n - fwd.length) + " stayed";
+    }
+    $("phaseLabel").textContent = label;
+    $("q").textContent = full;
+    $("sub").textContent = sub;
+    drawBoard(g && g.question && g.phase !== "waiting" ? full : "Step forward if you have…");
+
+    // which tray
+    const role = mine.role || null;
+    $("lobby").hidden = !!role;
+    $("qmPanel").hidden = role !== "qm";
+    $("playerPanel").hidden = role !== "player";
+
+    // lobby
+    const canLive = !!room && !roomDead && live;
+    $("joinBtn").disabled = !canLive;
+    $("qmBtn").disabled = !canLive || !!s.otherQm;
+    let note;
+    if (!room || roomDead) note = deadReason || "Live play is unavailable right now. You can still practice with bots.";
+    else if (!live) note = "Connecting to the live stage…";
+    else if (s.otherQm) note = g.name + " is the Question Master. Join the stage to play.";
+    else if (derive().players.length === 0) note = "Send the invite link to friends. Everyone in this room plays together.";
+    else note = "Nobody is asking questions yet. Be the Question Master, or join the stage and wait.";
+    $("lobbyNote").textContent = note;
+
+    // question master tray
+    if (role === "qm") {
+      const ph = g && g.isMe ? g.phase : "waiting";
+      $("askBtn").disabled = ph === "answering" || s.blockedQm;
+      $("revealBtn").disabled = ph !== "answering" || s.blockedQm;
+      $("nextBtn").disabled = ph !== "reveal" || s.blockedQm;
+      const tally = $("tally"); tally.replaceChildren();
+      const row = (k, v) => { const dt = document.createElement("dt"); dt.textContent = k; const dd = document.createElement("dd"); dd.textContent = v; tally.append(dt, dd); };
+      const names = (arr) => arr.length ? arr.map((p) => p.name).join(", ") : "—";
+      if (s.blockedQm) row("Note", (g ? g.name : "Someone") + " is already Question Master.");
+      else if (ph === "waiting") row("On stage", n ? names(s.players) : "nobody yet");
+      else {
+        row("Forward", names(fwd));
+        row("Stay", names(s.players.filter((p) => p.choice === 0)));
+        row("Deciding", names(s.players.filter((p) => p.choice < 0)));
+      }
+    }
+
+    // player tray
+    if (role === "player") {
+      const canPick = !!(g && g.phase === "answering");
+      const myPick = g && mine.round === g.round ? mine.choice : null;
+      $("fwdBtn").disabled = !canPick; $("stayBtn").disabled = !canPick;
+      $("fwdBtn").setAttribute("aria-pressed", String(myPick === 1));
+      $("stayBtn").setAttribute("aria-pressed", String(myPick === 0));
+      let pn;
+      if (!g) pn = "No Question Master yet. Tap Leave and pick Be Question Master to run it.";
+      else if (g.phase === "waiting") pn = g.name + " is picking a question. Get ready.";
+      else if (g.phase === "answering") pn = myPick == null ? "Be honest. Nobody sees your choice until the reveal." : "Locked in. You can still switch before the reveal.";
+      else pn = myPick === 1 ? "You stepped forward." : myPick === 0 ? "You stayed back." : "You sat this one out.";
+      $("playerNote").textContent = pn;
+    }
+
+    // connection pill
+    const conn = $("conn");
+    let ct;
+    if (practice) ct = "Practice";
+    else if (!room || roomDead) ct = "Offline";
+    else if (!live) ct = "Connecting…";
+    else { const here = room.peers().length; ct = "Room " + ROOM + " · " + here + " here"; }
+    conn.classList.toggle("live", practice || (!!room && !roomDead && live));
+    $("connText").textContent = ct;
+  }
+
+  // ---------- actions ----------
+  function joinStage() {
+    setMine({ role: "player", name: myName(), look: myLook, choice: null, round: null, phase: null, question: null });
+  }
+  function becomeQm() {
+    setMine({ role: "qm", name: myName(), look: myLook, phase: "waiting", question: "", round: Date.now(), choice: null });
+  }
+  function leave() {
+    if (practice) {
+      practice = false; bots = []; botTimers.forEach(clearTimeout); botTimers = [];
+      mine = {}; render(); return;
+    }
+    setMine({ role: null, name: null, look: null, choice: null, round: null, phase: null, question: null });
+  }
+  let lastQ = -1;
+  function randomQ() {
+    let i = Math.floor(Math.random() * QUESTIONS.length);
+    if (i === lastQ) i = (i + 1) % QUESTIONS.length;
+    lastQ = i; return QUESTIONS[i];
+  }
+  function ask() {
+    let text = $("qIn").value.replace(/^\s*step forward if you have\s*/i, "").trim().slice(0, 120);
+    if (!text) text = randomQ();
+    $("qIn").value = "";
+    const round = Date.now();
+    setMine({ phase: "answering", question: text, round });
+    if (practice) runBots(round);
+  }
+  function choose(c) {
+    const g = derive().game;
+    if (!g || g.phase !== "answering") return;
+    setMine({ choice: c, round: g.round });
+  }
+
+  // practice mode: you ask, bots answer
+  function startPractice() {
+    practice = true;
+    mine = { role: "qm", name: myName(), look: myLook, phase: "waiting", question: "", round: 1 };
+    bots = BOT_NAMES.map((name, i) => ({ peer: "b" + i, p: { role: "player", name, look: (myLook + 7 + i * 11) % 60, choice: null, round: null } }));
+    render();
+  }
+  function runBots(round) {
+    botTimers.forEach(clearTimeout); botTimers = [];
+    bots.forEach((b) => {
+      b.p = Object.assign({}, b.p, { choice: null, round: null });
+      botTimers.push(setTimeout(() => {
+        if (!practice || mine.round !== round) return;
+        b.p = Object.assign({}, b.p, { choice: Math.random() < 0.5 ? 1 : 0, round });
+        render();
+      }, 600 + Math.random() * 2600));
+    });
+    render();
+  }
+
+  $("joinBtn").addEventListener("click", joinStage);
+  $("qmBtn").addEventListener("click", becomeQm);
+  $("practiceBtn").addEventListener("click", startPractice);
+  $("qmLeave").addEventListener("click", leave);
+  $("playerLeave").addEventListener("click", leave);
+  $("randBtn").addEventListener("click", () => { $("qIn").value = randomQ(); $("qIn").focus(); });
+  $("askBtn").addEventListener("click", ask);
+  $("qIn").addEventListener("keydown", (e) => { if (e.key === "Enter" && !$("askBtn").disabled) ask(); });
+  $("revealBtn").addEventListener("click", () => setMine({ phase: "reveal" }));
+  $("nextBtn").addEventListener("click", () => { botTimers.forEach(clearTimeout); setMine({ phase: "waiting", question: "" }); });
+  $("fwdBtn").addEventListener("click", () => choose(1));
+  $("stayBtn").addEventListener("click", () => choose(0));
+  $("nameIn").addEventListener("change", () => { const n = myName(); if (mine.role) setMine({ name: n }); });
+
+  render();
+  if (document.fonts && document.fonts.load) {
+    document.fonts.load("80px Bungee").then(() => { boardKey = null; drawFloor(); render(); }).catch(() => {});
+  }
+
+  // ---------- connect to Firebase ----------
+  const fromHash = (location.hash || "").replace("#", "").toUpperCase();
+  const startCode = /^[A-Z0-9]{4,8}$/.test(fromHash) ? fromHash : newCode();
+  try {
+    if (window.firebase && window.FIREBASE_CONFIG) {
+      const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(window.FIREBASE_CONFIG);
+      db = app.database();
+      room = { peers: fbPeers };
+      db.ref(".info/connected").on("value", (s) => {
+        live = !!s.val();
+        if (live && mine.role && !practice) pushMine();  // re-arm after reconnect
+        render();
+      });
+    }
+  } catch (e) { console.warn(e); room = null; deadReason = "Could not start the live connection."; }
+  joinRoom(startCode);
+  window.addEventListener("hashchange", () => {
+    const c = (location.hash || "").replace("#", "").toUpperCase();
+    if (/^[A-Z0-9]{4,8}$/.test(c) && c !== ROOM) joinRoom(c);
+  });
+  $("newRoomBtn").addEventListener("click", () => joinRoom(newCode()));
+  $("copyBtn").addEventListener("click", () => {
+    const url = location.href.split("#")[0] + "#" + ROOM;
+    const done = () => { $("copyBtn").textContent = "Copied"; setTimeout(() => { $("copyBtn").textContent = "Copy invite link"; }, 1600); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, () => window.prompt("Copy this link:", url));
+    else window.prompt("Copy this link:", url);
+  });
+})();
+</script>
+</body>
+</html>

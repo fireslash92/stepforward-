@@ -1,0 +1,19 @@
+{
+  "rules": {
+    "games": {
+      "$room": {
+        ".read": "$room.matches(/^[A-Z0-9]{4,8}$/)",
+        "qm": {
+          ".write": "$room.matches(/^[A-Z0-9]{4,8}$/)",
+          ".validate": "newData.child('owner').isString() && newData.child('owner').val().length <= 40 && (!newData.child('question').exists() || newData.child('question').val().length <= 120) && (!newData.child('name').exists() || newData.child('name').val().length <= 16)"
+        },
+        "players": {
+          "$player": {
+            ".write": "$room.matches(/^[A-Z0-9]{4,8}$/) && $player.length <= 40",
+            ".validate": "!newData.child('name').exists() || (newData.child('name').isString() && newData.child('name').val().length <= 16)"
+          }
+        }
+      }
+    }
+  }
+}
