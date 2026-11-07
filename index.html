@@ -72,6 +72,9 @@
     font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted);
   }
   .pill { display: inline-flex; align-items: center; gap: 6px; }
+  .eyebrow .right { display: inline-flex; align-items: center; gap: 10px; }
+  #muteBtn { min-height: 28px; padding: 3px 10px; font: 500 11px var(--body); letter-spacing: 0.08em; text-transform: uppercase; border-radius: 999px; color: var(--muted); }
+  #muteBtn[aria-pressed=true] { color: var(--marquee); border-color: rgba(255, 210, 63, 0.5); }
   .dot { width: 8px; height: 8px; border-radius: 50%; background: #776a99; }
   .pill.live .dot { background: var(--go); box-shadow: 0 0 8px var(--go); }
   #q {
@@ -144,7 +147,7 @@
     <div class="marquee">
       <div class="eyebrow">
         <span id="phaseLabel">Party game</span>
-        <span class="pill" id="conn"><span class="dot"></span><span id="connText">Connecting…</span></span>
+        <span class="right"><button id="muteBtn" aria-pressed="true">Sound on</button><span class="pill" id="conn"><span class="dot"></span><span id="connText">Connecting…</span></span></span>
       </div>
       <h1 id="q">Step forward if you have…</h1>
       <p id="sub">Pick a name, then join the stage or run the questions.</p>
@@ -251,6 +254,94 @@
   let myLook = parseInt(store.get("sf-look"), 10);
   if (!Number.isFinite(myLook)) { myLook = Math.floor(Math.random() * 60); store.set("sf-look", String(myLook)); }
   $("nameIn").value = store.get("sf-name") || "";
+
+  // ---------- sound effects (synthesized with Web Audio, no files) ----------
+  const sfx = (() => {
+    let ctx = null, master = null, muted = store.get("sf-mute") === "1";
+    function ac() {
+      if (!ctx) {
+        const C = window.AudioContext || window.webkitAudioContext;
+        if (!C) return null;
+        ctx = new C(); master = ctx.createGain(); master.gain.value = 0.9; master.connect(ctx.destination);
+      }
+      if (ctx.state === "suspended") ctx.resume().catch(() => {});
+      return ctx;
+    }
+    function tone(c, freq, start, dur, type, vol, slideTo) {
+      const o = c.createOscillator(), g = c.createGain();
+      o.type = type || "square";
+      o.frequency.setValueAtTime(freq, start);
+      if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, start + dur);
+      g.gain.setValueAtTime(0.0001, start);
+      g.gain.exponentialRampToValueAtTime(vol || 0.12, start + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+      o.connect(g); g.connect(master); o.start(start); o.stop(start + dur + 0.02);
+    }
+    let noiseBuf = null;
+    function noise(c, start, dur, vol, freq) {
+      if (!noiseBuf) {
+        noiseBuf = c.createBuffer(1, c.sampleRate * 0.5, c.sampleRate);
+        const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      }
+      const src = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain();
+      src.buffer = noiseBuf; f.type = "bandpass"; f.frequency.value = freq || 900; f.Q.value = 0.8;
+      g.gain.setValueAtTime(vol, start); g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+      src.connect(f); f.connect(g); g.connect(master); src.start(start); src.stop(start + dur + 0.02);
+    }
+    const sounds = {
+      click(c, t) { tone(c, 640, t, 0.07, "square", 0.06); },
+      pop(c, t) { tone(c, 420, t, 0.09, "sine", 0.18, 900); },
+      tick(c, t) { tone(c, 1500, t, 0.05, "sine", 0.06); },
+      ask(c, t) {
+        tone(c, 988, t, 0.5, "sine", 0.22); tone(c, 1976, t, 0.35, "sine", 0.05);
+        tone(c, 1319, t + 0.16, 0.7, "sine", 0.22); tone(c, 2637, t + 0.16, 0.4, "sine", 0.05);
+      },
+      whoosh(c, t) { noise(c, t, 0.35, 0.25, 600); tone(c, 300, t, 0.3, "sine", 0.05, 900); },
+      leave(c, t) { tone(c, 520, t, 0.12, "triangle", 0.1); tone(c, 390, t + 0.1, 0.18, "triangle", 0.1); },
+      reveal(c, t, forwardCount) {
+        // drumroll that swells, a cymbal hit, a fanfare, then a boing per player who steps forward
+        const roll = 0.75;
+        for (let x = 0; x < roll; x += 0.045) noise(c, t + x, 0.06, 0.06 + 0.25 * (x / roll), 220);
+        const hit = t + roll;
+        noise(c, hit, 0.9, 0.35, 5000);
+        [523.25, 659.25, 783.99].forEach((f, i) => tone(c, f, hit + i * 0.09, 0.25, "sawtooth", 0.07));
+        tone(c, 1046.5, hit + 0.27, 0.6, "sawtooth", 0.08);
+        tone(c, 783.99, hit + 0.27, 0.6, "triangle", 0.08);
+        const n = Math.min(forwardCount, 12);
+        for (let i = 0; i < n; i++) tone(c, 220 + i * 25, hit + 0.15 + i * 0.12, 0.22, "sine", 0.16, 700 + i * 40);
+      },
+    };
+    return {
+      unlock() { if (!muted) ac(); },
+      play(name, arg) {
+        if (muted || !sounds[name]) return;
+        const c = ac(); if (!c) return;
+        try { sounds[name](c, c.currentTime + 0.01, arg); } catch (e) {}
+      },
+      toggle() { muted = !muted; store.set("sf-mute", muted ? "1" : "0"); if (!muted) { ac(); this.play("pop"); } return muted; },
+      get muted() { return muted; },
+    };
+  })();
+  // browsers only allow sound after a tap
+  document.addEventListener("pointerdown", () => sfx.unlock(), { passive: true });
+  const syncMute = () => { $("muteBtn").textContent = sfx.muted ? "Sound off" : "Sound on"; $("muteBtn").setAttribute("aria-pressed", String(!sfx.muted)); };
+  $("muteBtn").addEventListener("click", () => { sfx.toggle(); syncMute(); });
+  syncMute();
+
+  // play sounds when the shared game state changes, so everyone hears the same moments
+  let prevSound = null;
+  function soundHook(s) {
+    const g = s.game;
+    const cur = { phase: g ? g.phase : "none", round: g ? g.round : 0, n: s.players.length,
+      decided: s.players.filter((p) => p.choice >= 0).length, fwd: s.players.filter((p) => p.choice === 1).length };
+    const prev = prevSound; prevSound = cur;
+    if (!prev) return;  // first render: stay quiet
+    if (cur.phase === "answering" && (prev.phase !== "answering" || prev.round !== cur.round)) sfx.play("ask");
+    else if (cur.phase === "reveal" && prev.phase !== "reveal") sfx.play("reveal", cur.fwd);
+    else if (cur.phase === "waiting" && prev.phase === "reveal") sfx.play("whoosh");
+    else if (cur.phase === "answering" && cur.decided > prev.decided) sfx.play("tick");
+    if (cur.n > prev.n) sfx.play("pop");
+  }
 
   const clean = (v, fb) => {
     const s = String(v == null ? "" : v).replace(/[\u0000-\u001f]/g, "").trim().slice(0, 16);
@@ -664,6 +755,7 @@
     else if (!live) ct = "Connecting…";
     else { const here = room.peers().length; ct = "Room " + ROOM + " · " + here + " here"; }
     conn.classList.toggle("live", practice || (!!room && !roomDead && live));
+    soundHook(s);
     $("connText").textContent = ct;
   }
 
@@ -675,6 +767,7 @@
     setMine({ role: "qm", name: myName(), look: myLook, phase: "waiting", question: "", round: Date.now(), choice: null });
   }
   function leave() {
+    sfx.play("leave");
     if (practice) {
       practice = false; bots = []; botTimers.forEach(clearTimeout); botTimers = [];
       mine = {}; render(); return;
@@ -696,6 +789,7 @@
     if (practice) runBots(round);
   }
   function choose(c) {
+    sfx.play("click");
     const g = derive().game;
     if (!g || g.phase !== "answering") return;
     setMine({ choice: c, round: g.round });
@@ -726,7 +820,7 @@
   $("practiceBtn").addEventListener("click", startPractice);
   $("qmLeave").addEventListener("click", leave);
   $("playerLeave").addEventListener("click", leave);
-  $("randBtn").addEventListener("click", () => { $("qIn").value = randomQ(); $("qIn").focus(); });
+  $("randBtn").addEventListener("click", () => { sfx.play("click"); $("qIn").value = randomQ(); $("qIn").focus(); });
   $("askBtn").addEventListener("click", ask);
   $("qIn").addEventListener("keydown", (e) => { if (e.key === "Enter" && !$("askBtn").disabled) ask(); });
   $("revealBtn").addEventListener("click", () => setMine({ phase: "reveal" }));
